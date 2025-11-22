@@ -766,7 +766,21 @@ void editorExecuteCommand(char *cmd) {
     if (cmd == NULL || strlen(cmd) == 0) return;
     cmd = trim_whitespace(cmd);
     if (cmd == NULL || strlen(cmd) == 0) return;
-    if (strcmp(cmd, "q") == 0 || strcmp(cmd, "quit") == 0) {
+    if (strcmp(cmd, "q") == 0) {
+        editorCleanup();
+        E.is_file_tree = 0;
+        E.is_help_view = 0;
+        if (E.numrows == 0) {
+            editorContentAppendRow("", 0);
+        }
+        E.cx = 0;
+        E.cy = 0;
+        E.rowoff = 0;
+        E.dirty = 0;
+        editorRefreshScreen();
+        return;
+    }
+    else if (strcmp(cmd, "quit") == 0) {
         write(STDOUT_FILENO, "\x1b[2J", 4);
         write(STDOUT_FILENO, "\x1b[H", 3);
         editorCleanup();
