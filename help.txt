@@ -1,0 +1,26 @@
+help.txt        ate
+                                ATE - help
+
+      Move around:   Use the cursor keys, or "h" to go left,
+                     "j" to go down, "k" to go up, "l" to go right.
+Close this window:   Use ":q<Enter>".
+   Get out of ate:   Use "ctrl+q" or ":q<enter>" (careful, all changes are lost!)
+
+Jump to a subject:   Type CTRL+ARROWKEYS. Repeat to go where you want.
+
+    Deleting text:   Delete the characters under the cursor until the end
+                     of the line and [count]-1 more lines [into register x]; synonym for "d$".
+                     (not |linewise|)
+
+Explore directory:   Use CTRL+P, then <enter> to view contents of a directory
+                     or file.
+
+==============================================================================
+ATE COMMANDS
+
+------------------------------------------------------------------------------
+:help                Displays this help
+:checkhealth         Run editor health check
+:w or :write         Save file (if file doesn't exist yet, you'll be prompted to save it as one)
+:Ex and :bd          Toggle default file tree
+:q or :quit          Quit editor
