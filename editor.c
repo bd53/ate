@@ -256,7 +256,7 @@ void editorOpenFile() {
     }
     E.is_file_tree = 0;
     E.is_help_view = 0;
-    int result = editorOpen(filename);
+    editorOpen(filename);
     free(filename);
     if (E.numrows == 0) {
         editorContentAppendRow("", 0);
@@ -277,7 +277,7 @@ void editorOpenHelp() {
         }
     } else {
         editorCleanup();
-        int result = editorOpen("help.txt");
+        editorOpen("help.txt");
         if (E.numrows == 0) {
             editorContentAppendRow("", 0);
         }
@@ -445,7 +445,7 @@ void editorFileTreeOpen() {
     } else {
         E.is_file_tree = 0;
         E.is_help_view = 0;
-        int result = editorOpen(entry->path);
+        editorOpen(entry->path);
         if (E.numrows == 0) {
             editorContentAppendRow("", 0);
         }
