@@ -12,7 +12,6 @@
 #include <unistd.h>
 
 #include "common.h"
-#include "editor.h"
 #include "keybinds.h"
 #include "utils.h"
 

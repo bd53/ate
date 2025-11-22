@@ -10,8 +10,14 @@
 #include <unistd.h>
 
 #include "common.h"
-#include "editor.h"
+#include "content.h"
+#include "command.h"
+#include "display.h"
+#include "file.h"
+#include "init.h"
 #include "keybinds.h"
+#include "search.h"
+#include "tree.h"
 #include "utils.h"
 
 static int readEscapeSequence() {

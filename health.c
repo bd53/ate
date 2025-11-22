@@ -6,7 +6,8 @@
 #include <unistd.h>
 
 #include "common.h"
-#include "editor.h"
+#include "content.h"
+#include "display.h"
 #include "health.h"
 #include "keybinds.h"
 #include "utils.h"

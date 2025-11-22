@@ -56,7 +56,7 @@ typedef struct {
     enum HealthStatus missing_status;
 } ToolCheck;
 
-typedef struct FileEntry {
+typedef struct {
     char *name;
     char *path;
     int is_dir;

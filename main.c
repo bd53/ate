@@ -4,7 +4,10 @@
 
 #include <stdlib.h>
 
-#include "editor.h"
+#include "content.h"
+#include "display.h"
+#include "file.h"
+#include "init.h"
 #include "keybinds.h"
 #include "utils.h"
 
