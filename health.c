@@ -28,7 +28,7 @@ static void append_health_line(enum HealthStatus status, const char *format, ...
     va_end(args);
     char line[512];
     snprintf(line, sizeof(line), "  %s %s", get_status_icon(status), message);
-    editorContentAppendRow(line, strlen(line));
+    append_row(line, strlen(line));
 }
 
 static int command_exists(const char *cmd) {
@@ -69,17 +69,17 @@ static void check_tool(const ToolCheck *tool) {
     }
 }
 
-void editorCheckHealth() {
-    editorCleanup();
-    editorContentAppendRow("==============================================================================", 70);
-    editorContentAppendRow("default:", 8);
-    editorContentAppendRow(" ", 0);
+void check_health() {
+    run_cleanup();
+    append_row("==============================================================================", 70);
+    append_row("default:", 8);
+    append_row(" ", 0);
     append_health_line(HEALTH_INFO, "Shell: %s", get_env_var("SHELL"));
     append_health_line(HEALTH_INFO, "Terminal: %s", get_env_var("TERM"));
-    editorContentAppendRow(" ", 0);
-    editorContentAppendRow("==============================================================================", 70);
-    editorContentAppendRow("utility:", 8);
-    editorContentAppendRow(" ", 0);
+    append_row(" ", 0);
+    append_row("==============================================================================", 70);
+    append_row("utility:", 8);
+    append_row(" ", 0);
     ToolCheck tools[] = {
         {"CMake", "cmake", "--version", HEALTH_INFO, HEALTH_WARNING},
         {"GCC", "gcc", "--version", HEALTH_INFO, HEALTH_WARNING},
@@ -95,10 +95,10 @@ void editorCheckHealth() {
     for (size_t i = 0; i < sizeof(tools) / sizeof(tools[0]); i++) {
         check_tool(&tools[i]);
     }
-    editorContentAppendRow("", 0);
+    append_row("", 0);
     E.is_help_view = 1;
     E.cx = 0;
     E.cy = 0;
     E.rowoff = 0;
-    editorRefreshScreen();
+    refresh_screen();
 }

@@ -12,7 +12,7 @@
 #include "keybinds.h"
 #include "utils.h"
 
-void editorScroll() {
+void scroll_editor() {
     if (E.cy < E.rowoff) {
         E.rowoff = E.cy;
     }
@@ -21,7 +21,7 @@ void editorScroll() {
     }
 }
 
-char *editorPrompt(const char *prompt) {
+char *prompt(const char *prompt) {
     if (prompt == NULL) return NULL;
     size_t bufsize = 256;
     char *buf = malloc(bufsize);
@@ -39,23 +39,23 @@ char *editorPrompt(const char *prompt) {
     int prompt_len = strlen(static_prompt);
     while(1) {
         struct buffer ab = BUFFER_INIT;
-        abInit(&ab);
+        abinit(&ab);
         char pos_buf[32];
         snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;1H", prompt_row);
-        abAppend(&ab, pos_buf, strlen(pos_buf));
-        abAppend(&ab, "\x1b[K", 3);
-        abAppend(&ab, static_prompt, prompt_len);
-        abAppend(&ab, buf, buflen);
+        abappend(&ab, pos_buf, strlen(pos_buf));
+        abappend(&ab, "\x1b[K", 3);
+        abappend(&ab, static_prompt, prompt_len);
+        abappend(&ab, buf, buflen);
         int cursor_col = prompt_len + buflen + 1;
         snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;%dH", prompt_row, cursor_col);
-        abAppend(&ab, pos_buf, strlen(pos_buf));
+        abappend(&ab, pos_buf, strlen(pos_buf));
         if (write(STDOUT_FILENO, ab.b, ab.len) == -1) {
-            abFree(&ab);
+            abfree(&ab);
             free(buf);
             die("write");
         }
-        abFree(&ab);
-        int c = inputReadKey();
+        abfree(&ab);
+        int c = input_read_key();
         if (c == '\r') {
             if (buflen > 0) {
                 return buf;
@@ -89,7 +89,7 @@ char *editorPrompt(const char *prompt) {
     }
 }
 
-void editorViewDrawContent(struct buffer *ab) {
+void draw_content(struct buffer *ab) {
     if (ab == NULL) return;
     int file_content_rows = E.screenrows;
     int max_num = E.numrows > file_content_rows ? E.numrows : file_content_rows;
@@ -106,14 +106,14 @@ void editorViewDrawContent(struct buffer *ab) {
         char line_num_buf[32];
         int line_num_len;
         if (!E.is_file_tree) {
-            abAppend(ab, "\x1b[38;5;244m", 11);
+            abappend(ab, "\x1b[38;5;244m", 11);
             if (filerow >= E.numrows) {
                 line_num_len = snprintf(line_num_buf, sizeof(line_num_buf), "%*s", E.gutter_width, "~");
-                abAppend(ab, line_num_buf, line_num_len);
+                abappend(ab, line_num_buf, line_num_len);
             } else {
                 if (E.mode == MODE_NORMAL) {
                     if (filerow == E.cy) {
-                        abAppend(ab, "\x1b[33m", 5);
+                        abappend(ab, "\x1b[33m", 5);
                         line_num_len = snprintf(line_num_buf, sizeof(line_num_buf), "%*s ", E.gutter_width - 1, ">>");
                     } else {
                         int rel_num = abs(filerow - E.cy);
@@ -123,9 +123,9 @@ void editorViewDrawContent(struct buffer *ab) {
                     int abs_num = filerow + 1;
                     line_num_len = snprintf(line_num_buf, sizeof(line_num_buf), "%*d ", E.gutter_width - 1, abs_num);
                 }
-                abAppend(ab, line_num_buf, line_num_len);
+                abappend(ab, line_num_buf, line_num_len);
             }
-            abAppend(ab, "\x1b[m", 3);
+            abappend(ab, "\x1b[m", 3);
         }
         if (filerow < E.numrows) {
             erow *row = &E.row[filerow];
@@ -135,9 +135,9 @@ void editorViewDrawContent(struct buffer *ab) {
             if (len_to_draw > content_width) len_to_draw = content_width;
             if (E.is_file_tree) {
                 if (filerow < 3) {
-                    abAppend(ab, "\x1b[34m", 5);
+                    abappend(ab, "\x1b[34m", 5);
                 } else if (filerow == E.cy) {
-                    abAppend(ab, "\x1b[7m", 4);
+                    abappend(ab, "\x1b[7m", 4);
                 }
             }
             for (int i = 0; i < len_to_draw; i++) {
@@ -152,21 +152,21 @@ void editorViewDrawContent(struct buffer *ab) {
                     if (hl != current_hl) {
                         current_hl = hl;
                         char *color_code = (hl == HL_MATCH) ? "\x1b[45m" : "\x1b[0m";
-                        abAppend(ab, color_code, strlen(color_code));
+                        abappend(ab, color_code, strlen(color_code));
                     }
                 }
-                abAppend(ab, &c, 1);
+                abappend(ab, &c, 1);
             }
-            abAppend(ab, "\x1b[m", 3);
+            abappend(ab, "\x1b[m", 3);
         }
-        abAppend(ab, "\x1b[K", 3);
-        abAppend(ab, "\r\n", 2);
+        abappend(ab, "\x1b[K", 3);
+        abappend(ab, "\r\n", 2);
     }
 }
 
-void editorViewDrawStatusBar(struct buffer *ab) {
+void draw_status(struct buffer *ab) {
     if (ab == NULL) return;
-    abAppend(ab, "\x1b[7m", 4);
+    abappend(ab, "\x1b[7m", 4);
     char status[80];
     const char *filetype_name = "txt";
     char filename_status[64];
@@ -182,37 +182,37 @@ void editorViewDrawStatusBar(struct buffer *ab) {
     else mode_str = "UNKNOWN";
     int len = snprintf(status, sizeof(status), " %s | %s | R:%d L:%d", mode_str, filename_status, E.cy + 1, E.numrows > 0 ? E.numrows : 1);
     if (len > E.screencols) len = E.screencols;
-    abAppend(ab, status, len);
+    abappend(ab, status, len);
     char rstatus[80];
-    int rlen = snprintf(rstatus, sizeof(rstatus), " %s | C:%d ", filetype_name, E.cx + 1); 
+    int rlen = snprintf(rstatus, sizeof(rstatus), " %s | C:%d ", filetype_name, E.cx + 1);
     while (len < E.screencols - rlen) {
-        abAppend(ab, " ", 1);
+        abappend(ab, " ", 1);
         len++;
     }
-    abAppend(ab, rstatus, rlen);
-    abAppend(ab, "\x1b[m", 3);
-    abAppend(ab, "\r\n", 2);
+    abappend(ab, rstatus, rlen);
+    abappend(ab, "\x1b[m", 3);
+    abappend(ab, "\r\n", 2);
 }
 
-void editorRefreshScreen() {
-    editorScroll();
+void refresh_screen() {
+    scroll_editor();
     struct buffer ab = BUFFER_INIT;
-    abInit(&ab);
-    abAppend(&ab, "\x1b[?25l", 6);
-    abAppend(&ab, "\x1b[H", 3);
-    editorViewDrawContent(&ab);
-    editorViewDrawStatusBar(&ab);
+    abinit(&ab);
+    abappend(&ab, "\x1b[?25l", 6);
+    abappend(&ab, "\x1b[H", 3);
+    draw_content(&ab);
+    draw_status(&ab);
     char buf[32];
     int cur_y = (E.cy - E.rowoff) + 1;
     int cur_x = E.cx + 1 + E.gutter_width;
     snprintf(buf, sizeof(buf), "\x1b[%d;%dH", cur_y, cur_x);
-    abAppend(&ab, buf, strlen(buf));
+    abappend(&ab, buf, strlen(buf));
     if (E.mode == MODE_INSERT) {
-        abAppend(&ab, "\x1b[5 q", 5);
+        abappend(&ab, "\x1b[5 q", 5);
     } else {
-        abAppend(&ab, "\x1b[2 q", 5);
+        abappend(&ab, "\x1b[2 q", 5);
     }
-    abAppend(&ab, "\x1b[?25h", 6);
+    abappend(&ab, "\x1b[?25h", 6);
     if (write(STDOUT_FILENO, ab.b, ab.len) == -1) die("write");
-    abFree(&ab);
+    abfree(&ab);
 }

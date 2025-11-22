@@ -3,6 +3,6 @@
 
 #include "common.h"
 
-void editorCheckHealth();
+void check_health();
 
 #endif

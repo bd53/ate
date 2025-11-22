@@ -3,9 +3,9 @@
 
 #include "common.h"
 
-void editorBuildFileTree(const char *root_path);
-void editorFileTreeOpen();
-void editorToggleFileTree();
-void editorFreeFileEntries();
+void build_file_tree(const char *root_path);
+void open_file_tree();
+void toggle_file_tree();
+void free_file_entries();
 
 #endif

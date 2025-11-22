@@ -13,14 +13,14 @@
 #include "file.h"
 #include "utils.h"
 
-int editorOpen(char *filename) {
+int open_editor(char *filename) {
     if (filename == NULL) return -1;
     char *new_filename = strdup(filename);
     if (new_filename == NULL) die("strdup");
     FILE *fp = fopen(filename, "r");
     if (!fp) {
-        editorFreeRows();
-        editorFreeFileEntries();
+        free_rows();
+        free_file_entries();
         if (E.query) {
             free(E.query);
             E.query = NULL;
@@ -28,11 +28,11 @@ int editorOpen(char *filename) {
         E.filename = new_filename;
         E.is_help_view = 0;
         E.is_file_tree = 0;
-        editorContentAppendRow("", 0);
+        append_row("", 0);
         return -1;
     }
-    editorFreeRows();
-    editorFreeFileEntries();
+    free_rows();
+    free_file_entries();
     if (E.query) {
         free(E.query);
         E.query = NULL;
@@ -46,25 +46,25 @@ int editorOpen(char *filename) {
     while ((linelen = getline(&line, &linecap, fp)) != -1) {
         while (linelen > 0 && (line[linelen - 1] == '\n' || line[linelen - 1] == '\r'))
             linelen--;
-        editorContentAppendRow(line, linelen);
+        append_row(line, linelen);
     }
     free(line);
     fclose(fp);
     return 0;
 }
 
-void editorSave() {
+void save_editor() {
     if (E.filename == NULL) {
-        char *filename = editorPrompt("Save as: %s (ESC to cancel)");
+        char *filename = prompt("Save as: %s (ESC to cancel)");
         if (filename == NULL) {
-            editorRefreshScreen();
+            refresh_screen();
             return;
         }
         E.filename = filename;
     }
     FILE *fp = fopen(E.filename, "w");
     if (fp == NULL) {
-        editorRefreshScreen();
+        refresh_screen();
         return;
     }
     for (int i = 0; i < E.numrows; i++) {
@@ -72,31 +72,31 @@ void editorSave() {
         fputc('\n', fp);
     }
     if (fclose(fp) == EOF) {
-        editorRefreshScreen();
+        refresh_screen();
         return;
     }
     E.dirty = 0;
-    editorRefreshScreen();
+    refresh_screen();
 }
 
-void editorOpenFile() {
-    char *filename = editorPrompt("Open file: %s (ESC to cancel)");
+void open_file() {
+    char *filename = prompt("Open file: %s (ESC to cancel)");
     if (!filename) {
-        editorRefreshScreen();
+        refresh_screen();
         return;
     }
     if (E.is_file_tree) {
-        editorFreeFileEntries();
+        free_file_entries();
     }
     E.is_file_tree = 0;
     E.is_help_view = 0;
-    editorOpen(filename);
+    open_editor(filename);
     free(filename);
     if (E.numrows == 0) {
-        editorContentAppendRow("", 0);
+        append_row("", 0);
     }
     E.cx = 0;
     E.cy = 0;
     E.rowoff = 0;
-    editorRefreshScreen();
+    refresh_screen();
 }

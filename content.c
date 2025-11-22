@@ -10,7 +10,7 @@
 #include "tree.h"
 #include "utils.h"
 
-void editorFreeRows() {
+void free_rows() {
     for (int j = 0; j < E.numrows; j++) {
         free(E.row[j].chars);
         E.row[j].chars = NULL;
@@ -26,16 +26,16 @@ void editorFreeRows() {
     }
 }
 
-void editorCleanup() {
+void run_cleanup() {
     if (E.query) {
         free(E.query);
         E.query = NULL;
     }
-    editorFreeRows();
-    editorFreeFileEntries();
+    free_rows();
+    free_file_entries();
 }
 
-void editorContentInsertRow(int at, char *s, size_t len) {
+void insert_row(int at, char *s, size_t len) {
     if (at < 0 || at > E.numrows) return;
     erow *new_rows = realloc(E.row, sizeof(erow) * (E.numrows + 1));
     if (new_rows == NULL) die("realloc");
@@ -57,7 +57,7 @@ void editorContentInsertRow(int at, char *s, size_t len) {
     E.numrows++;
 }
 
-void editorContentAppendRow(char *s, size_t len) {
+void append_row(char *s, size_t len) {
     erow *new_rows = realloc(E.row, sizeof(erow) * (E.numrows + 1));
     if (new_rows == NULL) die("realloc");
     E.row = new_rows;
@@ -78,7 +78,7 @@ void editorContentAppendRow(char *s, size_t len) {
     E.numrows++;
 }
 
-void editorDelRow(int at) {
+void delete_row(int at) {
     if (at < 0 || at >= E.numrows) return;
     erow *row = &E.row[at];
     free(row->chars);
@@ -98,9 +98,9 @@ void editorDelRow(int at) {
     }
 }
 
-void editorContentInsertChar(char c) {
+void insert_character(char c) {
     if (E.cy == E.numrows) {
-        editorContentAppendRow("", 0);
+        append_row("", 0);
     }
     erow *row = &E.row[E.cy];
     if (E.cx < 0) E.cx = 0;
@@ -120,9 +120,9 @@ void editorContentInsertChar(char c) {
     E.dirty = 1;
 }
 
-void editorContentInsertNewline() {
+void insert_new_line() {
     if (E.cy == E.numrows) {
-        editorContentAppendRow("", 0);
+        append_row("", 0);
     } else {
         erow *row = &E.row[E.cy];
         int split_at = E.cx;
@@ -148,7 +148,7 @@ void editorContentInsertNewline() {
             die("realloc");
         }
         row->hl = new_hl;
-        editorContentInsertRow(E.cy + 1, second_half, second_half_len);
+        insert_row(E.cy + 1, second_half, second_half_len);
         free(second_half);
     }
     E.cy++;

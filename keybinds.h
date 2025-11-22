@@ -3,8 +3,8 @@
 
 #include "common.h"
 
-int inputReadKey();
-void editorCursorMove(int key);
-void editorProcessKeypress();
+int input_read_key();
+void cursor_move(int key);
+void process_keypress();
 
 #endif

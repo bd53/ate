@@ -9,7 +9,7 @@
 #include "init.h"
 #include "utils.h"
 
-void initEditor() {
+void editor_init() {
     E.cx = 0;
     E.cy = 0;
     E.rowoff = 0;
@@ -26,7 +26,7 @@ void initEditor() {
     E.dirty = 0;
     E.is_help_view = 0;
     E.is_file_tree = 0;
-    if (getWindowSize(&E.screenrows, &E.screencols) == -1) die("getWindowSize");
+    if (get_window_size(&E.screenrows, &E.screencols) == -1) die("get_window_size");
     E.screenrows -= 2;
     write(STDOUT_FILENO, "\x1b[?1049h", 8);
     write(STDOUT_FILENO, "\x1b[2J", 4);

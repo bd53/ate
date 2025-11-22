@@ -3,13 +3,13 @@
 
 #include <stddef.h>
 
-void editorContentInsertRow(int at, char *s, size_t len);
-void editorContentAppendRow(char *s, size_t len);
-void editorDelRow(int at);
-void editorContentInsertChar(char c);
-void editorContentInsertNewline();
-void editorFreeRows();
-void editorFreeFileEntries();
-void editorCleanup();
+void insert_row(int at, char *s, size_t len);
+void append_row(char *s, size_t len);
+void delete_row(int at);
+void insert_character(char c);
+void insert_new_line();
+void free_rows();
+void free_file_entries();
+void run_cleanup();
 
 #endif

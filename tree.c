@@ -21,7 +21,7 @@ static FileEntry *file_entries = NULL;
 static int num_entries = 0;
 static int entries_capacity = 0;
 
-void editorFreeFileEntries() {
+void free_file_entries() {
     for (int i = 0; i < num_entries; i++) {
         free(file_entries[i].name);
         file_entries[i].name = NULL;
@@ -34,7 +34,7 @@ void editorFreeFileEntries() {
     entries_capacity = 0;
 }
 
-static void editorScanDirectory(const char *path, int depth) {
+static void scan_directory(const char *path, int depth) {
     if (depth > 5) return;
     if (path == NULL) return;
     DIR *dir = opendir(path);
@@ -124,22 +124,22 @@ static void editorScanDirectory(const char *path, int depth) {
     free(temp_entries);
 }
 
-void editorBuildFileTree(const char *root_path) {
-    editorFreeRows();
-    editorFreeFileEntries();
+void build_file_tree(const char *root_path) {
+    free_rows();
+    free_file_entries();
     char cwd[1024];
     const char *scan_path = root_path ? root_path : getcwd(cwd, sizeof(cwd));
     if (!scan_path) {
-        editorContentAppendRow("Could not get current directory.", 32);
+        append_row("Could not get current directory.", 32);
         return;
     }
-    editorScanDirectory(scan_path, 0);
+    scan_directory(scan_path, 0);
     char title[256];
     snprintf(title, sizeof(title), "netft - %s", scan_path);
-    editorContentAppendRow(title, strlen(title));
-    editorContentAppendRow("Press ENTER to open file/directory, q to close", 47);
-    editorContentAppendRow("==============================================================================", 78);
-    editorContentAppendRow("../", 3);
+    append_row(title, strlen(title));
+    append_row("Press ENTER to open file/directory, q to close", 47);
+    append_row("==============================================================================", 78);
+    append_row("../", 3);
     for (int i = 0; i < num_entries; i++) {
         char line[512];
         int offset = 0;
@@ -152,11 +152,11 @@ void editorBuildFileTree(const char *root_path) {
         } else {
             snprintf(line + offset, sizeof(line) - offset, "%s", file_entries[i].name);
         }
-        editorContentAppendRow(line, strlen(line));
+        append_row(line, strlen(line));
     }
 }
 
-void editorFileTreeOpen() {
+void open_file_tree() {
     if (E.cy < 0 || E.cy >= E.numrows) return;
     erow *current_row = &E.row[E.cy];
     char *row_content = current_row->chars;
@@ -167,7 +167,7 @@ void editorFileTreeOpen() {
             snprintf(parent_path, sizeof(parent_path), "%s", cwd);
             char *parent = dirname(parent_path);
             if (parent && chdir(parent) == 0) {
-                editorBuildFileTree(NULL);
+                build_file_tree(NULL);
                 E.cx = 0;
                 E.cy = 0;
                 E.rowoff = 0;
@@ -181,7 +181,7 @@ void editorFileTreeOpen() {
     FileEntry *entry = &file_entries[entry_index];
     if (entry->is_dir) {
         if (chdir(entry->path) == 0) {
-            editorBuildFileTree(NULL);
+            build_file_tree(NULL);
             E.cx = 0;
             E.cy = 0;
             E.rowoff = 0;
@@ -189,9 +189,9 @@ void editorFileTreeOpen() {
     } else {
         E.is_file_tree = 0;
         E.is_help_view = 0;
-        editorOpen(entry->path);
+        open_editor(entry->path);
         if (E.numrows == 0) {
-            editorContentAppendRow("", 0);
+            append_row("", 0);
         }
         E.cx = 0;
         E.cy = 0;
@@ -199,20 +199,20 @@ void editorFileTreeOpen() {
     }
 }
 
-void editorToggleFileTree() {
+void toggle_file_tree() {
     if (E.is_file_tree) {
-        editorCleanup();
+        run_cleanup();
         E.is_file_tree = 0;
         if (E.numrows == 0) {
-            editorContentAppendRow("", 0);
+            append_row("", 0);
         }
     } else {
-        editorCleanup();
+        run_cleanup();
         E.is_file_tree = 1;
-        editorBuildFileTree(NULL);
+        build_file_tree(NULL);
         E.cx = 0;
         E.cy = 0;
         E.rowoff = 0;
     }
-    editorRefreshScreen();
+    refresh_screen();
 }

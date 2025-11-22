@@ -3,10 +3,10 @@
 
 #include "common.h"
 
-void editorScroll();
-void editorRefreshScreen();
-void editorViewDrawContent(struct buffer *ab);
-void editorViewDrawStatusBar(struct buffer *ab);
-char *editorPrompt(const char *prompt);
+void scroll_editor();
+void refresh_screen();
+void draw_content(struct buffer *ab);
+void draw_status(struct buffer *ab);
+char *prompt(const char *prompt);
 
 #endif

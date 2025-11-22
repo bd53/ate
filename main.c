@@ -12,17 +12,17 @@
 #include "utils.h"
 
 int main(int argc, char *argv[]) {
-    enableRawMode();
-    initEditor();
+    enable_raw_mode();
+    editor_init();
     if (argc >= 2) {
-        editorOpen(argv[1]);
+        open_editor(argv[1]);
     }
     if (E.numrows == 0) {
-        editorContentAppendRow("", 0);
+        append_row("", 0);
     }
     while (1) {
-        editorRefreshScreen();
-        editorProcessKeypress();
+        refresh_screen();
+        process_keypress();
     }
     return 0;
 }

@@ -9,7 +9,7 @@
 #include "display.h"
 #include "search.h"
 
-void editorFindNext(int direction) {
+void find_next(int direction) {
     if (E.query == NULL || strlen(E.query) == 0) return;
     E.match_row = -1;
     E.match_col = -1;
@@ -33,8 +33,8 @@ void editorFindNext(int direction) {
                 E.match_col = match_col;
                 E.search_start_row = r;
                 E.search_start_col = match_col;
-                editorScroll();
-                editorRefreshScreen();
+                scroll_editor();
+                refresh_screen();
                 return;
             }
         }
@@ -65,30 +65,30 @@ void editorFindNext(int direction) {
                 E.match_col = best_match_col;
                 E.search_start_row = r;
                 E.search_start_col = best_match_col;
-                editorScroll();
-                editorRefreshScreen();
+                scroll_editor();
+                refresh_screen();
                 return;
             }
         }
     }
 }
 
-void editorFind() {
+void toggle_find() {
     int saved_cx = E.cx;
     int saved_cy = E.cy;
     E.match_row = -1;
     E.match_col = -1;
-    char *query = editorPrompt("Find text: %s (ESC to cancel)");
+    char *query = prompt("Find text: %s (ESC to cancel)");
     if (query == NULL) {
         E.cx = saved_cx;
         E.cy = saved_cy;
-        editorRefreshScreen();
+        refresh_screen();
         return;
     }
     if (E.query) free(E.query);
     E.query = query;
     E.search_start_row = saved_cy;
     E.search_start_col = saved_cx;
-    editorFindNext(1);
-    editorRefreshScreen();
+    find_next(1);
+    refresh_screen();
 }

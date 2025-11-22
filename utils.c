@@ -24,7 +24,7 @@ void die(const char *s) {
     exit(1);
 }
 
-void disableRawMode() {
+void disable_raw_mode() {
     if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.orig_termios) == -1) {
         die("tcsetattr");
     }
@@ -34,11 +34,11 @@ void disableRawMode() {
     write(STDOUT_FILENO, "\x1b[?1003l", 9);
 }
 
-void enableRawMode() {
+void enable_raw_mode() {
     if (tcgetattr(STDIN_FILENO, &E.orig_termios) == -1) {
         die("tcgetattr");
     }
-    atexit(disableRawMode);
+    atexit(disable_raw_mode);
     struct termios raw = E.orig_termios;
     raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
     raw.c_oflag &= ~(OPOST);
@@ -54,7 +54,7 @@ void enableRawMode() {
     write(STDOUT_FILENO, "\x1b[?1003l", 9);
 }
 
-int getCursorPosition(int *rows, int *cols) {
+int get_cursor_position(int *rows, int *cols) {
     char buf[32];
     unsigned int i = 0;
     if (rows == NULL || cols == NULL) {
@@ -82,7 +82,7 @@ int getCursorPosition(int *rows, int *cols) {
     return 0;
 }
 
-int getWindowSize(int *rows, int *cols) {
+int get_window_size(int *rows, int *cols) {
     struct winsize ws;
     if (rows == NULL || cols == NULL) {
         return -1;
@@ -95,11 +95,11 @@ int getWindowSize(int *rows, int *cols) {
         if (write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12) {
             return -1;
         }
-        return getCursorPosition(rows, cols);
+        return get_cursor_position(rows, cols);
     }
 }
 
-void abInit(struct buffer *ab) {
+void abinit(struct buffer *ab) {
     if (ab == NULL) {
         return;
     }
@@ -107,7 +107,7 @@ void abInit(struct buffer *ab) {
     ab->len = 0;
 }
 
-void abAppend(struct buffer *ab, const char *s, int len) {
+void abappend(struct buffer *ab, const char *s, int len) {
     if (ab == NULL || s == NULL || len < 0) {
         return;
     }
@@ -123,7 +123,7 @@ void abAppend(struct buffer *ab, const char *s, int len) {
     ab->len += len;
 }
 
-void abFree(struct buffer *ab) {
+void abfree(struct buffer *ab) {
     if (ab == NULL) {
         return;
     }

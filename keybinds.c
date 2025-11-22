@@ -20,7 +20,7 @@
 #include "tree.h"
 #include "utils.h"
 
-static int readEscapeSequence() {
+static int read_esc_sequence() {
     char seq[5];
     if (read(STDIN_FILENO, &seq[0], 1) != 1) return '\x1b';
     if (read(STDIN_FILENO, &seq[1], 1) != 1) return '\x1b';
@@ -45,16 +45,16 @@ static int readEscapeSequence() {
     return '\x1b';
 }
 
-int inputReadKey() {
+int input_read_key() {
     int nread;
     char c;
     while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
         if (nread == -1 && errno != EAGAIN) die("read");
     }
-    return (c == '\x1b') ? readEscapeSequence() : c;
+    return (c == '\x1b') ? read_esc_sequence() : c;
 }
 
-void editorCursorMove(int key) {
+void cursor_move(int key) {
     erow *row = (E.cy >= 0 && E.cy < E.numrows) ? &E.row[E.cy] : NULL;
     E.match_row = -1;
     E.match_col = -1;
@@ -103,7 +103,7 @@ void editorCursorMove(int key) {
     if (E.cx > len) E.cx = len;
 }
 
-static int translateKey(int key) {
+static int translate_key(int key) {
     switch (key) {
         case 'h': return ARROW_LEFT;
         case 'j': return ARROW_DOWN;
@@ -113,31 +113,31 @@ static int translateKey(int key) {
     }
 }
 
-static void handleQuit() {
+static void handle_quit() {
     write(STDOUT_FILENO, "\x1b[2J", 4);
     write(STDOUT_FILENO, "\x1b[H", 3);
-    editorCleanup();
+    run_cleanup();
     exit(0);
 }
 
-static void handleFileTreeKeys(int c) {
+static void handle_file_tree(int c) {
     switch (c) {
         case CTRL_KEY('q'):
-            handleQuit();
+            handle_quit();
             break;
         case CTRL_KEY('p'):
-            editorToggleFileTree();
+            toggle_file_tree();
             return;
         case 'q':
         case '\x1b':
-            editorToggleFileTree();
+            toggle_file_tree();
             return;
         case ':':
             E.mode = MODE_COMMAND;
-            editorCommandMode();
+            command_mode();
             return;
         case '\r':
-            editorFileTreeOpen();
+            open_file_tree();
             return;
         case ARROW_UP:
         case ARROW_DOWN:
@@ -147,40 +147,40 @@ static void handleFileTreeKeys(int c) {
         case CTRL_ARROW_DOWN:
         case CTRL_ARROW_LEFT:
         case CTRL_ARROW_RIGHT:
-            editorCursorMove(c);
+            cursor_move(c);
             break;
         case 'h':
         case 'j':
         case 'k':
         case 'l':
-            editorCursorMove(translateKey(c));
+            cursor_move(translate_key(c));
             break;
     }
-    editorRefreshScreen();
+    refresh_screen();
 }
 
-static void handleHelpViewKeys(int c) {
+static void handle_help(int c) {
     switch (c) {
         case CTRL_KEY('q'):
-            handleQuit();
+            handle_quit();
             break;
         case 'q':
         case '\x1b':
-            editorCleanup();
+            run_cleanup();
             E.is_help_view = 0;
             if (E.numrows == 0) {
-                editorContentAppendRow("", 0);
+                append_row("", 0);
             }
             break;
         case ':':
             E.mode = MODE_COMMAND;
-            editorCommandMode();
+            command_mode();
             return;
         case CTRL_KEY('h'):
-            editorOpenHelp();
+            open_help();
             return;
         case CTRL_KEY('p'):
-            editorToggleFileTree();
+            toggle_file_tree();
             return;
         case ARROW_UP:
         case ARROW_DOWN:
@@ -190,46 +190,46 @@ static void handleHelpViewKeys(int c) {
         case CTRL_ARROW_DOWN:
         case CTRL_ARROW_LEFT:
         case CTRL_ARROW_RIGHT:
-            editorCursorMove(c);
+            cursor_move(c);
             break;
         case 'h':
         case 'j':
         case 'k':
         case 'l':
-            editorCursorMove(translateKey(c));
+            cursor_move(translate_key(c));
             break;
     }
-    editorRefreshScreen();
+    refresh_screen();
 }
 
-static void handleNormalMode(int c) {
+static void handle_normal_mode(int c) {
     switch (c) {
         case '\r':
             break;
         case ':':
             E.mode = MODE_COMMAND;
-            editorCommandMode();
+            command_mode();
             return;
         case CTRL_KEY('h'):
-            editorOpenHelp();
+            open_help();
             return;
         case CTRL_KEY('p'):
-            editorToggleFileTree();
+            toggle_file_tree();
             return;
         case CTRL_KEY('o'):
-            editorOpenFile();
+            open_file();
             return;
         case CTRL_KEY('f'):
-            editorFind();
+            toggle_find();
             return;
         case CTRL_KEY('s'):
-            editorSave();
+            save_editor();
             return;
         case 'n':
-            editorFindNext(1);
+            find_next(1);
             return;
         case 'N':
-            editorFindNext(-1);
+            find_next(-1);
             return;
         case 'i':
             E.mode = MODE_INSERT;
@@ -238,11 +238,11 @@ static void handleNormalMode(int c) {
         case 'j':
         case 'k':
         case 'l':
-            editorCursorMove(translateKey(c));
+            cursor_move(translate_key(c));
             break;
         case 'd':
             if (E.numrows > 0 && E.cy >= 0 && E.cy < E.numrows) {
-                editorDelRow(E.cy);
+                delete_row(E.cy);
                 if (E.numrows == 0) {
                     E.cy = 0;
                 } else if (E.cy >= E.numrows) {
@@ -255,7 +255,7 @@ static void handleNormalMode(int c) {
     }
 }
 
-static void handleBackspace() {
+static void handle_backspace() {
     if (E.cy < 0 || E.cy >= E.numrows) return;
     E.dirty = 1;
     if (E.cx > 0) {
@@ -287,46 +287,46 @@ static void handleBackspace() {
     }
 }
 
-static void handleInsertMode(int c) {
+static void handle_insert_mode(int c) {
     switch (c) {
         case '\r':
             E.dirty = 1;
-            editorContentInsertNewline();
+            insert_new_line();
             break;
         case '\t':
             E.dirty = 1;
             for (int i = 0; i < 4; i++) {
-                editorContentInsertChar(' ');
+                insert_character(' ');
             }
             break;
         case 127:
-            handleBackspace();
+            handle_backspace();
             break;
         default:
             if (c >= 32 && c < 127) {
                 E.dirty = 1;
-                editorContentInsertChar(c);
+                insert_character(c);
             }
             break;
     }
 }
 
-void editorProcessKeypress() {
-    int c = inputReadKey();
+void process_keypress() {
+    int c = input_read_key();
     if (E.is_file_tree) {
-        handleFileTreeKeys(c);
+        handle_file_tree(c);
         return;
     }
     if (E.is_help_view) {
-        handleHelpViewKeys(c);
+        handle_help(c);
         return;
     }
     switch (c) {
         case CTRL_KEY('q'):
-            handleQuit();
+            handle_quit();
             break;
         case CTRL_KEY('p'):
-            editorToggleFileTree();
+            toggle_file_tree();
             break;
         case '\x1b':
             if (E.mode == MODE_INSERT) {
@@ -344,15 +344,15 @@ void editorProcessKeypress() {
         case CTRL_ARROW_DOWN:
         case CTRL_ARROW_LEFT:
         case CTRL_ARROW_RIGHT:
-            editorCursorMove(c);
+            cursor_move(c);
             break;
         default:
             if (E.mode == MODE_NORMAL) {
-                handleNormalMode(c);
+                handle_normal_mode(c);
             } else if (E.mode == MODE_INSERT) {
-                handleInsertMode(c);
+                handle_insert_mode(c);
             }
             break;
     }
-    editorRefreshScreen();
+    refresh_screen();
 }

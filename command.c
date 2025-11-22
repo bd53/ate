@@ -17,19 +17,19 @@
 #include "tree.h"
 #include "utils.h"
 
-void editorOpenHelp() {
+void open_help() {
     if (E.is_help_view) {
-        editorCleanup();
+        run_cleanup();
         E.is_help_view = 0;
         E.is_file_tree = 0;
         if (E.numrows == 0) {
-            editorContentAppendRow("", 0);
+            append_row("", 0);
         }
     } else {
-        editorCleanup();
-        editorOpen("help.txt");
+        run_cleanup();
+        open_editor("help.txt");
         if (E.numrows == 0) {
-            editorContentAppendRow("", 0);
+            append_row("", 0);
         }
         E.cx = 0;
         E.cy = 0;
@@ -37,39 +37,39 @@ void editorOpenHelp() {
         E.is_help_view = 1;
         E.is_file_tree = 0;
     }
-    editorRefreshScreen();
+    refresh_screen();
 }
 
-void editorExecuteCommand(char *cmd) {
+void execute_command(char *cmd) {
     if (cmd == NULL || strlen(cmd) == 0) return;
     cmd = trim_whitespace(cmd);
     if (cmd == NULL || strlen(cmd) == 0) return;
     if (strcmp(cmd, "q") == 0) {
-        editorCleanup();
+        run_cleanup();
         E.is_file_tree = 0;
         E.is_help_view = 0;
         if (E.numrows == 0) {
-            editorContentAppendRow("", 0);
+            append_row("", 0);
         }
         E.cx = 0;
         E.cy = 0;
         E.rowoff = 0;
         E.dirty = 0;
-        editorRefreshScreen();
+        refresh_screen();
         return;
     }
     else if (strcmp(cmd, "quit") == 0) {
         write(STDOUT_FILENO, "\x1b[2J", 4);
         write(STDOUT_FILENO, "\x1b[H", 3);
-        editorCleanup();
+        run_cleanup();
         exit(0);
     }
     else if (strcmp(cmd, "Ex") == 0) {
-        editorToggleFileTree();
+        toggle_file_tree();
     }
     else if (strcmp(cmd, "bd") == 0) {
         if (E.is_file_tree) {
-            editorToggleFileTree();
+            toggle_file_tree();
         }
     }
     else if (strncmp(cmd, "w", 1) == 0) {
@@ -90,24 +90,24 @@ void editorExecuteCommand(char *cmd) {
             }
         }
         if (E.filename == NULL) {
-            char *filename = editorPrompt("Save as: %s (ESC to cancel)");
+            char *filename = prompt("Save as: %s (ESC to cancel)");
             if (!filename) {
-                editorRefreshScreen();
+                refresh_screen();
                 return;
             }
             E.filename = filename;
         }
-        editorSave();
+        save_editor();
     }
     else if (strcmp(cmd, "help") == 0) {
-        editorOpenHelp();
+        open_help();
     }
     else if (strcmp(cmd, "checkhealth") == 0) {
-        editorCheckHealth();
+        check_health();
     }
 }
 
-void editorCommandMode() {
+void command_mode() {
     size_t bufsize = 256;
     char *buf = malloc(bufsize);
     if (!buf) die("malloc");
@@ -115,42 +115,42 @@ void editorCommandMode() {
     buf[0] = '\0';
     int prompt_row = E.screenrows + 2;
     while(1) {
-        editorScroll();
+        scroll_editor();
         struct buffer ab = BUFFER_INIT;
-        abInit(&ab);
-        abAppend(&ab, "\x1b[?25l", 6);
-        abAppend(&ab, "\x1b[H", 3);
-        editorViewDrawContent(&ab);
-        editorViewDrawStatusBar(&ab);
+        abinit(&ab);
+        abappend(&ab, "\x1b[?25l", 6);
+        abappend(&ab, "\x1b[H", 3);
+        draw_content(&ab);
+        draw_status(&ab);
         char pos_buf[32];
         snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;1H", prompt_row);
-        abAppend(&ab, pos_buf, strlen(pos_buf));
-        abAppend(&ab, "\x1b[K", 3);
-        abAppend(&ab, ":", 1);
-        abAppend(&ab, buf, buflen);
+        abappend(&ab, pos_buf, strlen(pos_buf));
+        abappend(&ab, "\x1b[K", 3);
+        abappend(&ab, ":", 1);
+        abappend(&ab, buf, buflen);
         int cursor_col = buflen + 2;
         snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;%dH", prompt_row, cursor_col);
-        abAppend(&ab, pos_buf, strlen(pos_buf));
-        abAppend(&ab, "\x1b[?25h", 6);
+        abappend(&ab, pos_buf, strlen(pos_buf));
+        abappend(&ab, "\x1b[?25h", 6);
         if (write(STDOUT_FILENO, ab.b, ab.len) == -1) {
-            abFree(&ab);
+            abfree(&ab);
             free(buf);
             die("write");
         }
-        abFree(&ab);
-        int c = inputReadKey();
+        abfree(&ab);
+        int c = input_read_key();
         if (c == '\r') {
             E.mode = MODE_NORMAL;
             if (buflen > 0) {
-                editorExecuteCommand(buf);
+                execute_command(buf);
             }
             free(buf);
-            editorRefreshScreen();
+            refresh_screen();
             return;
         } else if (c == '\x1b') {
             E.mode = MODE_NORMAL;
             free(buf);
-            editorRefreshScreen();
+            refresh_screen();
             return;
         } else if (c == 127 || c == CTRL_KEY('h')) {
             if (buflen > 0) {

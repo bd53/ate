@@ -1,8 +1,8 @@
 #ifndef COMMAND_H
 #define COMMAND_H
 
-void editorOpenHelp();
-void editorCommandMode();
-void editorExecuteCommand(char *cmd);
+void open_help();
+void command_mode();
+void execute_command(char *cmd);
 
 #endif
