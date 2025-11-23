@@ -97,38 +97,39 @@ void draw_content(struct buffer *ab) {
     if (E.is_file_tree) {
         E.gutter_width = 0;
     }
-    for (int y = 0; y < file_content_rows; y++) {
-        int filerow = y + E.rowoff;
-        char line_num_buf[32];
-        int line_num_len;
-        if (!E.is_file_tree) {
-            abappend(ab, "\x1b[38;5;244m", 11);
-            if (filerow >= E.numrows) {
-                line_num_len = snprintf(line_num_buf, sizeof(line_num_buf), "%*s", E.gutter_width, "~");
-                abappend(ab, line_num_buf, line_num_len);
-            } else {
-                if (E.mode == MODE_NORMAL) {
-                    if (filerow == E.cy) {
-                        abappend(ab, "\x1b[33m", 5);
-                        line_num_len = snprintf(line_num_buf, sizeof(line_num_buf), "%*s ", E.gutter_width - 1, ">>");
+    int content_width = E.screencols - E.gutter_width;
+    int screen_row = 0;
+    for (int filerow = E.rowoff; filerow < E.numrows && screen_row < file_content_rows; filerow++) {
+        erow *row = &E.row[filerow];
+        int wrapped_lines = (row->size + content_width - 1) / content_width;
+        if (wrapped_lines == 0) wrapped_lines = 1;
+        for (int wrap_line = 0; wrap_line < wrapped_lines && screen_row < file_content_rows; wrap_line++, screen_row++) {
+            char line_num_buf[32];
+            int line_num_len;
+            if (!E.is_file_tree) {
+                abappend(ab, "\x1b[38;5;244m", 11);
+                if (wrap_line == 0) {
+                    if (E.mode == MODE_NORMAL) {
+                        if (filerow == E.cy) {
+                            abappend(ab, "\x1b[33m", 5);
+                            line_num_len = snprintf(line_num_buf, sizeof(line_num_buf), "%*s ", E.gutter_width - 1, ">>");
+                        } else {
+                            int rel_num = abs(filerow - E.cy);
+                            line_num_len = snprintf(line_num_buf, sizeof(line_num_buf), "%*d ", E.gutter_width - 1, rel_num);
+                        }
                     } else {
-                        int rel_num = abs(filerow - E.cy);
-                        line_num_len = snprintf(line_num_buf, sizeof(line_num_buf), "%*d ", E.gutter_width - 1, rel_num);
+                        int abs_num = filerow + 1;
+                        line_num_len = snprintf(line_num_buf, sizeof(line_num_buf), "%*d ", E.gutter_width - 1, abs_num);
                     }
                 } else {
-                    int abs_num = filerow + 1;
-                    line_num_len = snprintf(line_num_buf, sizeof(line_num_buf), "%*d ", E.gutter_width - 1, abs_num);
+                    line_num_len = snprintf(line_num_buf, sizeof(line_num_buf), "%*s ", E.gutter_width - 1, "");
                 }
                 abappend(ab, line_num_buf, line_num_len);
+                abappend(ab, "\x1b[m", 3);
             }
-            abappend(ab, "\x1b[m", 3);
-        }
-        if (filerow < E.numrows) {
-            erow *row = &E.row[filerow];
-            int current_hl = HL_NORMAL;
-            int content_width = E.screencols - E.gutter_width;
-            int len_to_draw = row->size;
-            if (len_to_draw > content_width) len_to_draw = content_width;
+            int start_idx = wrap_line * content_width;
+            int end_idx = start_idx + content_width;
+            if (end_idx > row->size) end_idx = row->size;
             if (E.is_file_tree) {
                 if (filerow < 3) {
                     abappend(ab, "\x1b[34m", 5);
@@ -136,7 +137,8 @@ void draw_content(struct buffer *ab) {
                     abappend(ab, "\x1b[7m", 4);
                 }
             }
-            for (int i = 0; i < len_to_draw; i++) {
+            int current_hl = HL_NORMAL;
+            for (int i = start_idx; i < end_idx; i++) {
                 char c = row->chars[i];
                 if (!E.is_file_tree) {
                     int hl = row->hl[i];
@@ -154,9 +156,21 @@ void draw_content(struct buffer *ab) {
                 abappend(ab, &c, 1);
             }
             abappend(ab, "\x1b[m", 3);
+            abappend(ab, "\x1b[K", 3);
+            abappend(ab, "\r\n", 2);
+        }
+    }
+    while (screen_row < file_content_rows) {
+        if (!E.is_file_tree) {
+            abappend(ab, "\x1b[38;5;244m", 11);
+            char line_num_buf[32];
+            int line_num_len = snprintf(line_num_buf, sizeof(line_num_buf), "%*s", E.gutter_width, "~");
+            abappend(ab, line_num_buf, line_num_len);
+            abappend(ab, "\x1b[m", 3);
         }
         abappend(ab, "\x1b[K", 3);
         abappend(ab, "\r\n", 2);
+        screen_row++;
     }
 }
 
@@ -198,9 +212,21 @@ void refresh_screen() {
     abappend(&ab, "\x1b[H", 3);
     draw_content(&ab);
     draw_status(&ab);
+    int content_width = E.screencols - E.gutter_width;
+    int screen_row = 0;
+    for (int filerow = E.rowoff; filerow < E.cy && filerow < E.numrows; filerow++) {
+        erow *row = &E.row[filerow];
+        int wrapped_lines = (row->size + content_width - 1) / content_width;
+        if (wrapped_lines == 0) wrapped_lines = 1;
+        screen_row += wrapped_lines;
+    }
+    if (E.cy >= 0 && E.cy < E.numrows) {
+        int wrap_offset = E.cx / content_width;
+        screen_row += wrap_offset;
+    }
+    int cur_x = (E.cx % content_width) + E.gutter_width + 1;
+    int cur_y = screen_row + 1;
     char buf[32];
-    int cur_y = (E.cy - E.rowoff) + 1;
-    int cur_x = E.cx + 1 + E.gutter_width;
     snprintf(buf, sizeof(buf), "\x1b[%d;%dH", cur_y, cur_x);
     abappend(&ab, buf, strlen(buf));
     if (E.mode == MODE_INSERT) {
