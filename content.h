@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 
-int utf8_char_len(const char *s);
+int utf8_char_len(const char *s, int max_len);
 int utf8_is_char_boundary(const char *s, int byte_offset);
 int utf8_prev_char_boundary(const char *s, int byte_offset);
 int utf8_next_char_boundary(const char *s, int byte_offset, int max_len);

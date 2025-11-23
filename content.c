@@ -6,46 +6,52 @@
 #include "tree.h"
 #include "utils.h"
 
-int utf8_char_len(const char *s) {
-    if (s == NULL || *s == '\0') return 0;
+int utf8_char_len(const char *s, int max_len) {
+    if (s == NULL || max_len <= 0) return 0;
     unsigned char c = (unsigned char)*s;
     if (c < 0x80) return 1;
+    if (max_len < 2) return 0;
     if ((c & 0xE0) == 0xC0) return 2;
+    if (max_len < 3) return 0;
     if ((c & 0xF0) == 0xE0) return 3;
+    if (max_len < 4) return 0;
     if ((c & 0xF8) == 0xF0) return 4;
-    return 1;
+    return 0;
 }
 
-int utf8_decode(const char *s, int *codepoint) {
-    if (s == NULL || *s == '\0') return 0;
+int utf8_decode(const char *s, int max_len, int *codepoint) {
+    if (s == NULL || max_len <= 0) return 0;
     unsigned char c = (unsigned char)*s;
     if (c < 0x80) {
         *codepoint = c;
         return 1;
     }
     if ((c & 0xE0) == 0xC0) {
-        if ((s[1] & 0xC0) != 0x80) return 1;
+        if (max_len < 2 || (s[1] & 0xC0) != 0x80) return -1;
         *codepoint = ((c & 0x1F) << 6) | (s[1] & 0x3F);
+        if (*codepoint < 0x80) return -1;
         return 2;
     }
     if ((c & 0xF0) == 0xE0) {
-        if ((s[1] & 0xC0) != 0x80 || (s[2] & 0xC0) != 0x80) return 1;
+        if (max_len < 3 || (s[1] & 0xC0) != 0x80 || (s[2] & 0xC0) != 0x80) return -1;
         *codepoint = ((c & 0x0F) << 12) | ((s[1] & 0x3F) << 6) | (s[2] & 0x3F);
+        if (*codepoint < 0x800 || (*codepoint >= 0xD800 && *codepoint <= 0xDFFF)) return -1;
         return 3;
     }
     if ((c & 0xF8) == 0xF0) {
-        if ((s[1] & 0xC0) != 0x80 || (s[2] & 0xC0) != 0x80 || (s[3] & 0xC0) != 0x80) return 1;
+        if (max_len < 4 || (s[1] & 0xC0) != 0x80 || (s[2] & 0xC0) != 0x80 || (s[3] & 0xC0) != 0x80) return -1;
         *codepoint = ((c & 0x07) << 18) | ((s[1] & 0x3F) << 12) | ((s[2] & 0x3F) << 6) | (s[3] & 0x3F);
+        if (*codepoint < 0x10000 || *codepoint > 0x10FFFF) return -1;
         return 4;
     }
-    return 1;
+    return -1;
 }
 
 int utf8_is_valid(int codepoint) {
-    if (codepoint >= 0xA0 && codepoint <= 0x10FFFF) {
-        return 1;
+    if (codepoint >= 0xD800 && codepoint <= 0xDFFF) {
+        return 0;
     }
-    if (codepoint >= 0x20 && codepoint <= 0x7E) {
+    if (codepoint >= 0x00 && codepoint <= 0x10FFFF) {
         return 1;
     }
     return 0;
@@ -69,7 +75,12 @@ int utf8_prev_char_boundary(const char *s, int byte_offset) {
 
 int utf8_next_char_boundary(const char *s, int byte_offset, int max_len) {
     if (byte_offset >= max_len) return max_len;
-    int len = utf8_char_len(&s[byte_offset]);
+    int remaining_len = max_len - byte_offset;
+    int len = utf8_char_len(&s[byte_offset], remaining_len);
+    if (len == 0) {
+        if (remaining_len > 0) return byte_offset + 1;
+        return byte_offset;
+    }
     byte_offset += len;
     if (byte_offset > max_len) return max_len;
     return byte_offset;
@@ -78,9 +89,7 @@ int utf8_next_char_boundary(const char *s, int byte_offset, int max_len) {
 void free_rows() {
     for (int j = 0; j < E.numrows; j++) {
         free(E.row[j].chars);
-        E.row[j].chars = NULL;
         free(E.row[j].hl);
-        E.row[j].hl = NULL;
     }
     free(E.row);
     E.row = NULL;
@@ -115,6 +124,7 @@ void insert_row(int at, char *s, size_t len) {
     E.row[at].hl = malloc(hl_size);
     if (E.row[at].hl == NULL) {
         free(E.row[at].chars);
+        memmove(&E.row[at], &E.row[at + 1], sizeof(erow) * (E.numrows - at));
         die("malloc");
     }
     memset(E.row[at].hl, HL_NORMAL, hl_size);
@@ -148,9 +158,7 @@ void delete_row(int at) {
     if (at < 0 || at >= E.numrows) return;
     erow *row = &E.row[at];
     free(row->chars);
-    row->chars = NULL;
     free(row->hl);
-    row->hl = NULL;
     memmove(&E.row[at], &E.row[at + 1], sizeof(erow) * (E.numrows - at - 1));
     E.numrows--;
     if (E.numrows == 0) {
@@ -161,6 +169,8 @@ void delete_row(int at) {
         erow *new_rows = realloc(E.row, sizeof(erow) * E.numrows);
         if (new_rows != NULL) {
             E.row = new_rows;
+        } else {
+            die("realloc (delete_row shrink)");
         }
         if (E.cy >= E.numrows) {
             E.cy = E.numrows - 1;
@@ -240,24 +250,25 @@ void insert_new_line() {
 
 void delete_character() {
     if (E.cx == 0 && E.cy == 0) return;
+    if (E.cy >= E.numrows) return;
     if (E.cx == 0) {
+        if (E.cy == 0) return;
         E.cy--;
-        E.cx = E.row[E.cy].size;
-        if (E.cy + 1 < E.numrows) {
-            erow *row = &E.row[E.cy];
-            erow *next_row = &E.row[E.cy + 1];
-            char *new_chars = realloc(row->chars, row->size + next_row->size + 1);
-            if (new_chars == NULL) die("realloc");
-            row->chars = new_chars;
-            memcpy(&row->chars[row->size], next_row->chars, next_row->size);
-            row->size += next_row->size;
-            row->chars[row->size] = '\0';
-            unsigned char *new_hl = realloc(row->hl, row->size > 0 ? row->size : 1);
-            if (new_hl == NULL) die("realloc");
-            row->hl = new_hl;
-            memcpy(&row->hl[E.cx], next_row->hl, next_row->size);
-            delete_row(E.cy + 1);
-        }
+        erow *row = &E.row[E.cy];
+        erow *next_row = &E.row[E.cy + 1];
+        E.cx = row->size;
+        char *new_chars = realloc(row->chars, row->size + next_row->size + 1);
+        if (new_chars == NULL) die("realloc");
+        row->chars = new_chars;
+        memcpy(&row->chars[row->size], next_row->chars, next_row->size);
+        row->size += next_row->size;
+        row->chars[row->size] = '\0';
+        unsigned char *new_hl = realloc(row->hl, row->size > 0 ? row->size : 1);
+        if (new_hl == NULL) die("realloc");
+        row->hl = new_hl;
+        memcpy(&row->hl[E.cx], next_row->hl, next_row->size);
+        delete_row(E.cy + 1);
+        E.dirty = 1;
     } else {
         erow *row = &E.row[E.cy];
         int prev_pos = utf8_prev_char_boundary(row->chars, E.cx);
@@ -267,9 +278,8 @@ void delete_character() {
         memmove(&row->hl[prev_pos], &row->hl[E.cx], row->size - prev_pos);
         int new_hl_size = row->size > 0 ? row->size : 1;
         unsigned char *new_hl = realloc(row->hl, new_hl_size);
-        if (new_hl != NULL) {
-            row->hl = new_hl;
-        }
+        if (new_hl == NULL) die("realloc");
+        row->hl = new_hl;
         E.cx = prev_pos;
         E.dirty = 1;
     }
@@ -286,7 +296,7 @@ void insert_utf8_character(const char *utf8_char, int char_len) {
         E.cx = utf8_prev_char_boundary(row->chars, E.cx);
     }
     int codepoint;
-    int decoded_len = utf8_decode(utf8_char, &codepoint);
+    int decoded_len = utf8_decode(utf8_char, char_len, &codepoint);
     if (decoded_len != char_len || !utf8_is_valid(codepoint)) {
         return;
     }
