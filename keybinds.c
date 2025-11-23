@@ -1,7 +1,3 @@
-#define _DEFAULT_SOURCE
-#define _BSD_SOURCE
-#define _GNU_SOURCE
-
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,8 +6,8 @@
 #include <unistd.h>
 
 #include "common.h"
-#include "content.h"
 #include "command.h"
+#include "content.h"
 #include "display.h"
 #include "file.h"
 #include "init.h"
