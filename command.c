@@ -108,6 +108,18 @@ void execute_command(char *cmd) {
     else if (strcmp(cmd, "checkhealth") == 0) {
         check_health();
     }
+    else {
+        char error_msg[256];
+        snprintf(error_msg, sizeof(error_msg), "\x1b[31mE182: Not an editor command: '%s'\x1b[0m", cmd);
+        int prompt_row = E.screenrows + 2;
+        char pos_buf[32];
+        snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;1H", prompt_row);
+        write(STDOUT_FILENO, pos_buf, strlen(pos_buf));
+        write(STDOUT_FILENO, "\x1b[K", 3);
+        write(STDOUT_FILENO, error_msg, strlen(error_msg));
+        input_read_key();
+        refresh_screen();
+    }
 }
 
 void command_mode() {
