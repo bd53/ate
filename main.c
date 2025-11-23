@@ -1,5 +1,6 @@
-#include <stdlib.h>
 #include <locale.h>
+#include <stdlib.h>
+
 #include "content.h"
 #include "display.h"
 #include "file.h"

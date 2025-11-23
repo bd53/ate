@@ -371,7 +371,7 @@ void delete_line() {
         if (E.cy < 0) E.cy = 0;
         E.cx = 0;
         E.dirty = 1;
-        char msg[512];
+        char msg[600];
         snprintf(msg, sizeof(msg), "\x1b[31mDeleted: '%s'\x1b[0m", saved_line);
         int prompt_row = E.screenrows + 2;
         char pos_buf[32];
