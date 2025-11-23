@@ -1,5 +1,5 @@
 #include <stdlib.h>
-
+#include <locale.h>
 #include "content.h"
 #include "display.h"
 #include "file.h"
@@ -8,6 +8,7 @@
 #include "utils.h"
 
 int main(int argc, char *argv[]) {
+    setlocale(LC_ALL, "");
     enable_raw_mode();
     editor_init();
     if (argc >= 2) {

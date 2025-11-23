@@ -57,7 +57,11 @@ void cursor_move(int key) {
     switch (key) {
         case 1004:
             if (E.cx > 0) {
-                E.cx--;
+                if (row) {
+                    E.cx = utf8_prev_char_boundary(row->chars, E.cx);
+                } else {
+                    E.cx--;
+                }
             } else if (E.cy > 0) {
                 E.cy--;
                 if (E.cy >= 0 && E.cy < E.numrows) {
@@ -67,7 +71,7 @@ void cursor_move(int key) {
             break;
         case 1005:
             if (row && E.cx < row->size) {
-                E.cx++;
+                E.cx = utf8_next_char_boundary(row->chars, E.cx, row->size);
             } else if (row && E.cx == row->size && E.cy < E.numrows - 1) {
                 E.cy++;
                 E.cx = 0;
@@ -97,6 +101,11 @@ void cursor_move(int key) {
     row = (E.numrows > 0 && E.cy >= 0 && E.cy < E.numrows) ? &E.row[E.cy] : NULL;
     int len = row ? row->size : 0;
     if (E.cx > len) E.cx = len;
+    if (row && E.cx > 0 && E.cx < row->size) {
+        if (!utf8_is_char_boundary(row->chars, E.cx)) {
+            E.cx = utf8_prev_char_boundary(row->chars, E.cx);
+        }
+    }
 }
 
 static int translate_key(int key) {
@@ -251,38 +260,6 @@ static void handle_normal_mode(int c) {
     }
 }
 
-static void handle_backspace() {
-    if (E.cy < 0 || E.cy >= E.numrows) return;
-    E.dirty = 1;
-    if (E.cx > 0) {
-        erow *row = &E.row[E.cy];
-        E.cx--;
-        memmove(&row->chars[E.cx], &row->chars[E.cx + 1], row->size - E.cx);
-        row->size--;
-        char *new_chars = realloc(row->chars, row->size + 1);
-        if (new_chars == NULL) die("realloc");
-        row->chars = new_chars;
-        row->chars[row->size] = '\0';
-    } else if (E.cy > 0) {
-        erow *prev_row = &E.row[E.cy - 1];
-        erow *curr_row = &E.row[E.cy];
-        E.cx = prev_row->size;
-        char *new_chars = realloc(prev_row->chars, prev_row->size + curr_row->size + 1);
-        if (new_chars == NULL) die("realloc");
-        prev_row->chars = new_chars;
-        memcpy(&prev_row->chars[prev_row->size], curr_row->chars, curr_row->size);
-        prev_row->size += curr_row->size;
-        prev_row->chars[prev_row->size] = '\0';
-        free(curr_row->chars);
-        curr_row->chars = NULL;
-        free(curr_row->hl);
-        curr_row->hl = NULL;
-        memmove(&E.row[E.cy], &E.row[E.cy + 1], sizeof(erow) * (E.numrows - E.cy - 1));
-        E.numrows--;
-        E.cy--;
-    }
-}
-
 static void handle_insert_mode(int c) {
     switch (c) {
         case '\r':
@@ -296,12 +273,31 @@ static void handle_insert_mode(int c) {
             }
             break;
         case 127:
-            handle_backspace();
+            delete_character();
             break;
         default:
             if (c >= 32 && c < 127) {
                 E.dirty = 1;
                 insert_character(c);
+            } else if (c >= 128) {
+                char utf8_buf[5];
+                utf8_buf[0] = (char)c;
+                int char_len = 1;
+                unsigned char uc = (unsigned char)c;
+                if ((uc & 0xE0) == 0xC0) char_len = 2;
+                else if ((uc & 0xF0) == 0xE0) char_len = 3;
+                else if ((uc & 0xF8) == 0xF0) char_len = 4;
+                for (int i = 1; i < char_len; i++) {
+                    int next_byte = input_read_key();
+                    if (next_byte < 0x80 || next_byte > 0xBF) {
+                        return;
+                    }
+                    utf8_buf[i] = (char)next_byte;
+                }
+                utf8_buf[char_len] = '\0';
+
+                E.dirty = 1;
+                insert_utf8_characater(utf8_buf, char_len);
             }
             break;
     }
@@ -327,7 +323,10 @@ void process_keypress() {
         case '\x1b':
             if (E.mode == MODE_INSERT) {
                 E.mode = MODE_NORMAL;
-                if (E.cx > 0) E.cx--;
+                if (E.cx > 0 && E.cy >= 0 && E.cy < E.numrows) {
+                    erow *row = &E.row[E.cy];
+                    E.cx = utf8_prev_char_boundary(row->chars, E.cx);
+                }
             } else if (E.mode == MODE_COMMAND) {
                 E.mode = MODE_NORMAL;
             }

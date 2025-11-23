@@ -7,6 +7,7 @@
 #include "content.h"
 #include "display.h"
 #include "file.h"
+#include "tree.h"
 #include "utils.h"
 
 int open_editor(char *filename) {

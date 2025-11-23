@@ -6,6 +6,40 @@
 #include "tree.h"
 #include "utils.h"
 
+int utf8_char_len(const char *s) {
+    if (s == NULL || *s == '\0') return 0;
+    unsigned char c = (unsigned char)*s;
+    if (c < 0x80) return 1;
+    if ((c & 0xE0) == 0xC0) return 2;
+    if ((c & 0xF0) == 0xE0) return 3;
+    if ((c & 0xF8) == 0xF0) return 4;
+    return 1;
+}
+
+int utf8_is_char_boundary(const char *s, int byte_offset) {
+    if (s == NULL || byte_offset < 0) return 1;
+    if (s[byte_offset] == '\0') return 1;
+    unsigned char c = (unsigned char)s[byte_offset];
+    return (c & 0xC0) != 0x80;
+}
+
+int utf8_prev_char_boundary(const char *s, int byte_offset) {
+    if (byte_offset <= 0) return 0;
+    byte_offset--;
+    while (byte_offset > 0 && !utf8_is_char_boundary(s, byte_offset)) {
+        byte_offset--;
+    }
+    return byte_offset;
+}
+
+int utf8_next_char_boundary(const char *s, int byte_offset, int max_len) {
+    if (byte_offset >= max_len) return max_len;
+    int len = utf8_char_len(&s[byte_offset]);
+    byte_offset += len;
+    if (byte_offset > max_len) return max_len;
+    return byte_offset;
+}
+
 void free_rows() {
     for (int j = 0; j < E.numrows; j++) {
         free(E.row[j].chars);
@@ -54,6 +88,7 @@ void insert_row(int at, char *s, size_t len) {
 }
 
 void append_row(char *s, size_t len) {
+    if (len > 0 && s[len - 1] == '\n') len--;
     erow *new_rows = realloc(E.row, sizeof(erow) * (E.numrows + 1));
     if (new_rows == NULL) die("realloc");
     E.row = new_rows;
@@ -109,6 +144,9 @@ void insert_character(char c) {
     erow *row = &E.row[E.cy];
     if (E.cx < 0) E.cx = 0;
     if (E.cx > row->size) E.cx = row->size;
+    if (!utf8_is_char_boundary(row->chars, E.cx)) {
+        E.cx = utf8_prev_char_boundary(row->chars, E.cx);
+    }
     char *new = realloc(row->chars, row->size + 2);
     if (new == NULL) die("realloc");
     row->chars = new;
@@ -134,6 +172,9 @@ void insert_new_line() {
         int split_at = E.cx;
         if (split_at < 0) split_at = 0;
         if (split_at > row->size) split_at = row->size;
+        if (!utf8_is_char_boundary(row->chars, split_at)) {
+            split_at = utf8_prev_char_boundary(row->chars, split_at);
+        }
         int second_half_len = row->size - split_at;
         char *second_half = malloc(second_half_len + 1);
         if (second_half == NULL) die("malloc");
@@ -159,5 +200,71 @@ void insert_new_line() {
     }
     E.cy++;
     E.cx = 0;
+    E.dirty = 1;
+}
+
+void delete_character() {
+    if (E.cx == 0 && E.cy == 0) return;
+    if (E.cx == 0) {
+        E.cy--;
+        E.cx = E.row[E.cy].size;
+        if (E.cy + 1 < E.numrows) {
+            erow *row = &E.row[E.cy];
+            erow *next_row = &E.row[E.cy + 1];
+            char *new_chars = realloc(row->chars, row->size + next_row->size + 1);
+            if (new_chars == NULL) die("realloc");
+            row->chars = new_chars;
+            memcpy(&row->chars[row->size], next_row->chars, next_row->size);
+            row->size += next_row->size;
+            row->chars[row->size] = '\0';
+            unsigned char *new_hl = realloc(row->hl, row->size > 0 ? row->size : 1);
+            if (new_hl == NULL) die("realloc");
+            row->hl = new_hl;
+            memcpy(&row->hl[E.cx], next_row->hl, next_row->size);
+            delete_row(E.cy + 1);
+        }
+    } else {
+        erow *row = &E.row[E.cy];
+        int prev_pos = utf8_prev_char_boundary(row->chars, E.cx);
+        int char_len = E.cx - prev_pos;
+        memmove(&row->chars[prev_pos], &row->chars[E.cx], row->size - E.cx + 1);
+        row->size -= char_len;
+        memmove(&row->hl[prev_pos], &row->hl[E.cx], row->size - prev_pos);
+        int new_hl_size = row->size > 0 ? row->size : 1;
+        unsigned char *new_hl = realloc(row->hl, new_hl_size);
+        if (new_hl != NULL) {
+            row->hl = new_hl;
+        }
+        E.cx = prev_pos;
+        E.dirty = 1;
+    }
+}
+
+void insert_utf8_characater(const char *utf8_char, int char_len) {
+    if (E.cy == E.numrows) {
+        append_row("", 0);
+    }
+    erow *row = &E.row[E.cy];
+    if (E.cx < 0) E.cx = 0;
+    if (E.cx > row->size) E.cx = row->size;
+    if (!utf8_is_char_boundary(row->chars, E.cx)) {
+        E.cx = utf8_prev_char_boundary(row->chars, E.cx);
+    }
+    char *new = realloc(row->chars, row->size + char_len + 1);
+    if (new == NULL) die("realloc");
+    row->chars = new;
+    memmove(&row->chars[E.cx + char_len], &row->chars[E.cx], row->size - E.cx + 1);
+    memcpy(&row->chars[E.cx], utf8_char, char_len);
+    row->size += char_len;
+    row->chars[row->size] = '\0';
+    int new_hl_size = row->size > 0 ? row->size : 1;
+    unsigned char *new_hl = realloc(row->hl, new_hl_size);
+    if (new_hl == NULL) die("realloc");
+    row->hl = new_hl;
+    memmove(&row->hl[E.cx + char_len], &row->hl[E.cx], row->size - E.cx - char_len);
+    for (int i = 0; i < char_len; i++) {
+        row->hl[E.cx + i] = HL_NORMAL;
+    }
+    E.cx += char_len;
     E.dirty = 1;
 }
