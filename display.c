@@ -238,3 +238,15 @@ void refresh_screen() {
     if (write(STDOUT_FILENO, ab.b, ab.len) == -1) die("write");
     abfree(&ab);
 }
+
+void display_message(int type, const char *message) {
+    const char *color = (type == 1) ? "\x1b[32m" : "\x1b[31m";
+    int prompt_row = E.screenrows + 2;
+    char pos_buf[32];
+    snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;1H", prompt_row);
+    write(STDOUT_FILENO, pos_buf, strlen(pos_buf));
+    write(STDOUT_FILENO, "\x1b[K", 3);
+    write(STDOUT_FILENO, color, strlen(color));
+    write(STDOUT_FILENO, message, strlen(message));
+    write(STDOUT_FILENO, "\x1b[0m", 4);
+}

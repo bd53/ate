@@ -4,9 +4,10 @@
 #include "common.h"
 
 void scroll_editor();
-void refresh_screen();
+char *prompt(const char *prompt);
 void draw_content(struct buffer *ab);
 void draw_status(struct buffer *ab);
-char *prompt(const char *prompt);
+void refresh_screen();
+void display_message(int type, const char *message);
 
 #endif

@@ -5,6 +5,7 @@
 
 #include "common.h"
 #include "content.h"
+#include "display.h"
 #include "search.h"
 #include "tree.h"
 #include "utils.h"
@@ -349,13 +350,8 @@ void yank_line() {
     free(encoded);
     char msg[512];
     int display_len = (row->size > 50) ? 50 : row->size;
-    snprintf(msg, sizeof(msg), "\x1b[32mYanked: '%.*s%s'\x1b[0m", display_len, row->chars, (row->size > 50) ? "..." : "");
-    int prompt_row = E.screenrows + 2;
-    char pos_buf[32];
-    snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;1H", prompt_row);
-    write(STDOUT_FILENO, pos_buf, strlen(pos_buf));
-    write(STDOUT_FILENO, "\x1b[K", 3);
-    write(STDOUT_FILENO, msg, strlen(msg));
+    snprintf(msg, sizeof(msg), "Yanked: '%.*s%s'", display_len, row->chars, (row->size > 50) ? "..." : "");
+    display_message(1, msg);
 }
 
 void delete_line() {
@@ -374,12 +370,7 @@ void delete_line() {
         E.cx = 0;
         E.dirty = 1;
         char msg[600];
-        snprintf(msg, sizeof(msg), "\x1b[31mDeleted: '%s'\x1b[0m", saved_line);
-        int prompt_row = E.screenrows + 2;
-        char pos_buf[32];
-        snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;1H", prompt_row);
-        write(STDOUT_FILENO, pos_buf, strlen(pos_buf));
-        write(STDOUT_FILENO, "\x1b[K", 3);
-        write(STDOUT_FILENO, msg, strlen(msg));
+        snprintf(msg, sizeof(msg), "Deleted: '%s'", saved_line);
+        display_message(2, msg);
     }
 }

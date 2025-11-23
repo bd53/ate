@@ -9,6 +9,7 @@
 #include "display.h"
 #include "file.h"
 #include "search.h"
+#include "utils.h"
 
 static char **filepaths = NULL;
 static int *rows = NULL;
@@ -23,16 +24,19 @@ static void add_search_result(const char *filepath, int row, int col, const char
     if (num_results >= capacity) {
         int new_capacity = capacity == 0 ? 64 : capacity * 2;
         char **new_filepaths = realloc(filepaths, sizeof(char *) * new_capacity);
-        if (!new_filepaths) return;
-        filepaths = new_filepaths;
         int *new_rows = realloc(rows, sizeof(int) * new_capacity);
-        if (!new_rows) return;
-        rows = new_rows;
         int *new_cols = realloc(cols, sizeof(int) * new_capacity);
-        if (!new_cols) return;
-        cols = new_cols;
         char **new_line_contents = realloc(line_contents, sizeof(char *) * new_capacity);
-        if (!new_line_contents) return;
+        if (!new_filepaths || !new_rows || !new_cols || !new_line_contents) {
+            if (new_filepaths && new_filepaths != filepaths) free(new_filepaths);
+            if (new_rows && new_rows != rows) free(new_rows);
+            if (new_cols && new_cols != cols) free(new_cols);
+            if (new_line_contents && new_line_contents != line_contents) free(new_line_contents);
+            return;
+        }
+        filepaths = new_filepaths;
+        rows = new_rows;
+        cols = new_cols;
         line_contents = new_line_contents;
         capacity = new_capacity;
     }
@@ -52,7 +56,7 @@ static void add_search_result(const char *filepath, int row, int col, const char
 
 static void collect_and_search_files(const char *dirpath, const char *query, int depth) {
     if (depth > 10) return;
-    if (dirpath == NULL) return;
+    if (dirpath == NULL || query == NULL) return;
     DIR *dir = opendir(dirpath);
     if (!dir) return;
     struct dirent *entry;
@@ -61,6 +65,9 @@ static void collect_and_search_files(const char *dirpath, const char *query, int
             continue;
         if (entry->d_name[0] == '.') continue;
         char full_path[2048];
+        size_t dirpath_len = strlen(dirpath);
+        size_t name_len = strlen(entry->d_name);
+        if (dirpath_len + name_len + 2 >= sizeof(full_path)) continue;
         int n = snprintf(full_path, sizeof(full_path), "%s/%s", dirpath, entry->d_name);
         if (n < 0 || n >= (int)sizeof(full_path)) continue;
         struct stat st;
@@ -88,14 +95,11 @@ static void collect_and_search_files(const char *dirpath, const char *query, int
             ssize_t linelen;
             int row_num = 0;
             while ((linelen = getline(&line, &linecap, fp)) != -1) {
-                while (linelen > 0 && (line[linelen - 1] == '\n' || line[linelen - 1] == '\r')) {
-                    line[linelen - 1] = '\0';
-                    linelen--;
-                }
-                char *pos = line;
+                char *trimmed = trim_whitespace(line);
+                char *pos = trimmed;
                 while ((pos = strstr(pos, query)) != NULL) {
-                    int col = pos - line;
-                    add_search_result(full_path, row_num, col, line);
+                    int col = (int)(pos - trimmed);
+                    add_search_result(full_path, row_num, col, trimmed);
                     pos++;
                 }
                 row_num++;
@@ -136,14 +140,6 @@ void toggle_workspace_find() {
     }
     if (strlen(query) == 0) {
         free(query);
-        char msg[256];
-        snprintf(msg, sizeof(msg), "\x1b[31mSearch cancelled\x1b[0m");
-        int prompt_row = E.screenrows + 2;
-        char pos_buf[32];
-        snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;1H", prompt_row);
-        write(STDOUT_FILENO, pos_buf, strlen(pos_buf));
-        write(STDOUT_FILENO, "\x1b[K", 3);
-        write(STDOUT_FILENO, msg, strlen(msg));
         refresh_screen();
         return;
     }
@@ -152,25 +148,10 @@ void toggle_workspace_find() {
     char cwd[1024];
     if (!getcwd(cwd, sizeof(cwd))) {
         free(query);
-        char msg[256];
-        snprintf(msg, sizeof(msg), "\x1b[31mCould not get current directory\x1b[0m");
-        int prompt_row = E.screenrows + 2;
-        char pos_buf[32];
-        snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;1H", prompt_row);
-        write(STDOUT_FILENO, pos_buf, strlen(pos_buf));
-        write(STDOUT_FILENO, "\x1b[K", 3);
-        write(STDOUT_FILENO, msg, strlen(msg));
+        display_message(2, "Could not get current directory");
         refresh_screen();
         return;
     }
-    char search_msg[256];
-    snprintf(search_msg, sizeof(search_msg), "\x1b[32mSearching workspace...\x1b[0m");
-    int prompt_row = E.screenrows + 2;
-    char pos_buf[32];
-    snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;1H", prompt_row);
-    write(STDOUT_FILENO, pos_buf, strlen(pos_buf));
-    write(STDOUT_FILENO, "\x1b[K", 3);
-    write(STDOUT_FILENO, search_msg, strlen(search_msg));
     refresh_screen();
     collect_and_search_files(cwd, query, 0);
     free(query);
@@ -202,35 +183,16 @@ void toggle_workspace_find() {
                 display_path = result_filepath + cwd_len + 1;
             }
         }
-        snprintf(msg, sizeof(msg), "\x1b[32mMatch %d/%d: %s:%d\x1b[0m", index + 1, num_results, display_path, result_row + 1);
-        prompt_row = E.screenrows + 2;
-        snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;1H", prompt_row);
-        write(STDOUT_FILENO, pos_buf, strlen(pos_buf));
-        write(STDOUT_FILENO, "\x1b[K", 3);
-        write(STDOUT_FILENO, msg, strlen(msg));
+        snprintf(msg, sizeof(msg), "Match %d/%d: %s:%d", index + 1, num_results, display_path, result_row + 1);
+        display_message(1, msg);
     } else {
-        char msg[256];
-        snprintf(msg, sizeof(msg), "\x1b[31mNo matches found in workspace\x1b[0m");
-        int prompt_row = E.screenrows + 2;
-        char pos_buf[32];
-        snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;1H", prompt_row);
-        write(STDOUT_FILENO, pos_buf, strlen(pos_buf));
-        write(STDOUT_FILENO, "\x1b[K", 3);
-        write(STDOUT_FILENO, msg, strlen(msg));
+        display_message(2, "No matches found in workspace");
     }
     refresh_screen();
 }
 
 void workspace_find_next(int direction) {
     if (num_results == 0) {
-        char msg[256];
-        snprintf(msg, sizeof(msg), "\x1b[31mNo search results (use Ctrl-F to search)\x1b[0m");
-        int prompt_row = E.screenrows + 2;
-        char pos_buf[32];
-        snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;1H", prompt_row);
-        write(STDOUT_FILENO, pos_buf, strlen(pos_buf));
-        write(STDOUT_FILENO, "\x1b[K", 3);
-        write(STDOUT_FILENO, msg, strlen(msg));
         refresh_screen();
         return;
     }
@@ -266,12 +228,7 @@ void workspace_find_next(int direction) {
             display_path = result_filepath + cwd_len + 1;
         }
     }
-    snprintf(msg, sizeof(msg), "\x1b[32mMatch %d/%d: %s:%d\x1b[0m", index + 1, num_results, display_path, result_row + 1);
-    int prompt_row = E.screenrows + 2;
-    char pos_buf[32];
-    snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;1H", prompt_row);
-    write(STDOUT_FILENO, pos_buf, strlen(pos_buf));
-    write(STDOUT_FILENO, "\x1b[K", 3);
-    write(STDOUT_FILENO, msg, strlen(msg));
+    snprintf(msg, sizeof(msg), "Match %d/%d: %s:%d", index + 1, num_results, display_path, result_row + 1);
+    display_message(1, msg);
     refresh_screen();
 }
