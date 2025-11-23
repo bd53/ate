@@ -62,6 +62,7 @@ static void scan_directory(const char *path, int depth) {
                 }
                 free(temp_entries);
                 closedir(dir);
+                free_file_entries();
                 die("realloc");
             }
             temp_entries = new_entries;
@@ -69,12 +70,15 @@ static void scan_directory(const char *path, int depth) {
         temp_entries[temp_count].name = strdup(entry->d_name);
         temp_entries[temp_count].path = strdup(full_path);
         if (!temp_entries[temp_count].name || !temp_entries[temp_count].path) {
-            for (int i = 0; i <= temp_count; i++) {
+            free(temp_entries[temp_count].name);
+            free(temp_entries[temp_count].path);
+            for (int i = 0; i < temp_count; i++) {
                 free(temp_entries[i].name);
                 free(temp_entries[i].path);
             }
             free(temp_entries);
             closedir(dir);
+            free_file_entries();
             die("strdup");
         }
         temp_entries[temp_count].is_dir = S_ISDIR(st.st_mode);
@@ -110,6 +114,7 @@ static void scan_directory(const char *path, int depth) {
                         free(temp_entries[k].path);
                     }
                     free(temp_entries);
+                    free_file_entries();
                     die("realloc");
                 }
                 file_entries = new_entries;

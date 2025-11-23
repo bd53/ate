@@ -87,15 +87,23 @@ void delete_row(int at) {
     row->hl = NULL;
     memmove(&E.row[at], &E.row[at + 1], sizeof(erow) * (E.numrows - at - 1));
     E.numrows--;
-    E.dirty = 1;
     if (E.numrows == 0) {
+        free(E.row);
+        E.row = NULL;
         E.cy = 0;
-    } else if (E.cy >= E.numrows) {
-        E.cy = E.numrows - 1;
+    } else {
+        erow *new_rows = realloc(E.row, sizeof(erow) * E.numrows);
+        if (new_rows != NULL) {
+            E.row = new_rows;
+        }
+        if (E.cy >= E.numrows) {
+            E.cy = E.numrows - 1;
+        }
     }
     if (E.cy < 0) {
         E.cy = 0;
     }
+    E.dirty = 1;
 }
 
 void insert_character(char c) {

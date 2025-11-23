@@ -52,7 +52,7 @@ static void append_section_header(const char *name) {
 
 static int check_command(const char *cmd, char *output_buf, size_t buf_size, const char *version_flag) {
     char command[512];
-    FILE *fp;
+    FILE *fp = NULL;
     snprintf(command, sizeof(command), "command -v %s > /dev/null 2>&1", cmd);
     if (system(command) != 0) {
         return 0;
@@ -181,12 +181,17 @@ static void check_external_tools() {
         if (check_command(cmd, NULL, 0, NULL)) {
             snprintf(command, sizeof(command), "command -v %s 2>/dev/null", cmd);
             fp = popen(command, "r");
-            if (fp && fgets(path, sizeof(path), fp)) {
-                path[strcspn(path, "\n")] = 0;
+            if (fp) {
+                if (fgets(path, sizeof(path), fp)) {
+                    path[strcspn(path, "\n")] = 0;
+                } else {
+                    strncpy(path, "unknown", sizeof(path) - 1);
+                    path[sizeof(path) - 1] = 0;
+                }
                 pclose(fp);
             } else {
-                if (fp) pclose(fp);
                 strncpy(path, "unknown", sizeof(path) - 1);
+                path[sizeof(path) - 1] = 0;
             }
             check_command(cmd, version, sizeof(version), flag);
             append_health_line(HEALTH_INFO, "OK %s: %s (%s)", name, version, path);

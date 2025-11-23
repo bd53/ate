@@ -85,7 +85,10 @@ void execute_command(char *cmd) {
             if (arg && *arg) {
                 char *new_filename = strdup(arg);
                 if (!new_filename) die("strdup");
-                if (E.filename) free(E.filename);
+                if (E.filename) {
+                    free(E.filename);
+                    E.filename = NULL;
+                }
                 E.filename = new_filename;
             }
         }

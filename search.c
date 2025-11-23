@@ -85,7 +85,10 @@ void toggle_find() {
         refresh_screen();
         return;
     }
-    if (E.query) free(E.query);
+    if (E.query) {
+        free(E.query);
+        E.query = NULL;
+    }
     E.query = query;
     E.search_start_row = saved_cy;
     E.search_start_col = saved_cx;

@@ -60,6 +60,9 @@ void save_editor() {
             refresh_screen();
             return;
         }
+        if (E.filename) {
+            free(E.filename);
+        }
         E.filename = filename;
     }
     FILE *fp = fopen(E.filename, "w");
