@@ -15,6 +15,6 @@ void delete_row(int at);
 void insert_character(char c);
 void insert_new_line();
 void delete_character();
-void insert_utf8_characater(const char *utf8_char, int char_len);
+void insert_utf8_character(const char *utf8_char, int char_len);
 
 #endif

@@ -16,6 +16,41 @@ int utf8_char_len(const char *s) {
     return 1;
 }
 
+int utf8_decode(const char *s, int *codepoint) {
+    if (s == NULL || *s == '\0') return 0;
+    unsigned char c = (unsigned char)*s;
+    if (c < 0x80) {
+        *codepoint = c;
+        return 1;
+    }
+    if ((c & 0xE0) == 0xC0) {
+        if ((s[1] & 0xC0) != 0x80) return 1;
+        *codepoint = ((c & 0x1F) << 6) | (s[1] & 0x3F);
+        return 2;
+    }
+    if ((c & 0xF0) == 0xE0) {
+        if ((s[1] & 0xC0) != 0x80 || (s[2] & 0xC0) != 0x80) return 1;
+        *codepoint = ((c & 0x0F) << 12) | ((s[1] & 0x3F) << 6) | (s[2] & 0x3F);
+        return 3;
+    }
+    if ((c & 0xF8) == 0xF0) {
+        if ((s[1] & 0xC0) != 0x80 || (s[2] & 0xC0) != 0x80 || (s[3] & 0xC0) != 0x80) return 1;
+        *codepoint = ((c & 0x07) << 18) | ((s[1] & 0x3F) << 12) | ((s[2] & 0x3F) << 6) | (s[3] & 0x3F);
+        return 4;
+    }
+    return 1;
+}
+
+int utf8_is_valid(int codepoint) {
+    if (codepoint >= 0xA0 && codepoint <= 0x10FFFF) {
+        return 1;
+    }
+    if (codepoint >= 0x20 && codepoint <= 0x7E) {
+        return 1;
+    }
+    return 0;
+}
+
 int utf8_is_char_boundary(const char *s, int byte_offset) {
     if (s == NULL || byte_offset < 0) return 1;
     if (s[byte_offset] == '\0') return 1;
@@ -240,7 +275,7 @@ void delete_character() {
     }
 }
 
-void insert_utf8_characater(const char *utf8_char, int char_len) {
+void insert_utf8_character(const char *utf8_char, int char_len) {
     if (E.cy == E.numrows) {
         append_row("", 0);
     }
@@ -249,6 +284,11 @@ void insert_utf8_characater(const char *utf8_char, int char_len) {
     if (E.cx > row->size) E.cx = row->size;
     if (!utf8_is_char_boundary(row->chars, E.cx)) {
         E.cx = utf8_prev_char_boundary(row->chars, E.cx);
+    }
+    int codepoint;
+    int decoded_len = utf8_decode(utf8_char, &codepoint);
+    if (decoded_len != char_len || !utf8_is_valid(codepoint)) {
+        return;
     }
     char *new = realloc(row->chars, row->size + char_len + 1);
     if (new == NULL) die("realloc");

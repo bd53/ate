@@ -297,7 +297,7 @@ static void handle_insert_mode(int c) {
                 utf8_buf[char_len] = '\0';
 
                 E.dirty = 1;
-                insert_utf8_characater(utf8_buf, char_len);
+                insert_utf8_character(utf8_buf, char_len);
             }
             break;
     }
