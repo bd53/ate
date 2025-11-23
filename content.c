@@ -116,6 +116,8 @@ void insert_character(char c) {
     unsigned char *new_hl = realloc(row->hl, new_hl_size);
     if (new_hl == NULL) die("realloc");
     row->hl = new_hl;
+    memmove(&row->hl[E.cx + 1], &row->hl[E.cx], row->size - E.cx - 1);
+    row->hl[E.cx] = HL_NORMAL;
     E.cx++;
     E.dirty = 1;
 }
