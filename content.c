@@ -1,5 +1,7 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "common.h"
 #include "content.h"
@@ -317,4 +319,65 @@ void insert_utf8_character(const char *utf8_char, int char_len) {
     }
     E.cx += char_len;
     E.dirty = 1;
+}
+
+void yank_line() {
+    if (E.cy < 0 || E.cy >= E.numrows) return;
+    erow *row = &E.row[E.cy];
+    char header[] = "\x1b]52;c;";
+    char trailer[] = "\x07";
+    static const char b64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    int len = row->size;
+    char *encoded = malloc(((len + 2) / 3) * 4 + 1);
+    if (!encoded) return;
+    int j = 0;
+    for (int i = 0; i < len; i += 3) {
+        int n = row->chars[i] << 16;
+        if (i + 1 < len) n |= row->chars[i + 1] << 8;
+        if (i + 2 < len) n |= row->chars[i + 2];
+        encoded[j++] = b64[(n >> 18) & 63];
+        encoded[j++] = b64[(n >> 12) & 63];
+        encoded[j++] = (i + 1 < len) ? b64[(n >> 6) & 63] : '=';
+        encoded[j++] = (i + 2 < len) ? b64[n & 63] : '=';
+    }
+    encoded[j] = '\0';
+    write(STDOUT_FILENO, header, strlen(header));
+    write(STDOUT_FILENO, encoded, strlen(encoded));
+    write(STDOUT_FILENO, trailer, strlen(trailer));
+    free(encoded);
+    char msg[512];
+    int display_len = (row->size > 50) ? 50 : row->size;
+    snprintf(msg, sizeof(msg), "\x1b[32mYanked: '%.*s%s'\x1b[0m", display_len, row->chars, (row->size > 50) ? "..." : "");
+    int prompt_row = E.screenrows + 2;
+    char pos_buf[32];
+    snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;1H", prompt_row);
+    write(STDOUT_FILENO, pos_buf, strlen(pos_buf));
+    write(STDOUT_FILENO, "\x1b[K", 3);
+    write(STDOUT_FILENO, msg, strlen(msg));
+}
+
+void delete_line() {
+    if (E.numrows > 0 && E.cy >= 0 && E.cy < E.numrows) {
+        erow *row = &E.row[E.cy];
+        char saved_line[512];
+        int display_len = (row->size > 50) ? 50 : row->size;
+        snprintf(saved_line, sizeof(saved_line), "%.*s%s", display_len, row->chars, (row->size > 50) ? "..." : "");
+        delete_row(E.cy);
+        if (E.numrows == 0) {
+            E.cy = 0;
+        } else if (E.cy >= E.numrows) {
+            E.cy = E.numrows - 1;
+        }
+        if (E.cy < 0) E.cy = 0;
+        E.cx = 0;
+        E.dirty = 1;
+        char msg[512];
+        snprintf(msg, sizeof(msg), "\x1b[31mDeleted: '%s'\x1b[0m", saved_line);
+        int prompt_row = E.screenrows + 2;
+        char pos_buf[32];
+        snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;1H", prompt_row);
+        write(STDOUT_FILENO, pos_buf, strlen(pos_buf));
+        write(STDOUT_FILENO, "\x1b[K", 3);
+        write(STDOUT_FILENO, msg, strlen(msg));
+    }
 }

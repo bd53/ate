@@ -36,6 +36,16 @@ static int read_esc_sequence() {
             case 'B': return 1003; // ARROW_DOWN
             case 'C': return 1005; // ARROW_RIGHT
             case 'D': return 1004; // ARROW_LEFT
+            case '3':
+                if (read(STDIN_FILENO, &seq[2], 1) == 1) {
+                    if (seq[2] == ';') {
+                        if (read(STDIN_FILENO, &seq[3], 1) == 1 && seq[3] == '5' &&
+                            read(STDIN_FILENO, &seq[4], 1) == 1 && seq[4] == '~') {
+                            return 1008; // CTRL_BACKSPACE
+                        }
+                    }
+                }
+                break;
         }
     }
     return '\x1b';
@@ -239,6 +249,9 @@ static void handle_normal_mode(int c) {
         case 'i':
             E.mode = MODE_INSERT;
             break;
+        case 'y':
+            yank_line();
+            break;
         case 'h':
         case 'j':
         case 'k':
@@ -246,16 +259,7 @@ static void handle_normal_mode(int c) {
             cursor_move(translate_key(c));
             break;
         case 'd':
-            if (E.numrows > 0 && E.cy >= 0 && E.cy < E.numrows) {
-                delete_row(E.cy);
-                if (E.numrows == 0) {
-                    E.cy = 0;
-                } else if (E.cy >= E.numrows) {
-                    E.cy = E.numrows - 1;
-                }
-                if (E.cy < 0) E.cy = 0;
-                E.cx = 0;
-            }
+            delete_line();
             break;
     }
 }
@@ -274,6 +278,10 @@ static void handle_insert_mode(int c) {
             break;
         case 127:
             delete_character();
+            break;
+        case 8:
+        case 1008:
+            delete_line();
             break;
         default:
             if (c >= 32 && c < 127) {
@@ -319,6 +327,18 @@ void process_keypress() {
             break;
         case CTRL_KEY('p'):
             toggle_file_tree();
+            break;
+        case 8:
+            if (E.mode == MODE_INSERT) {
+                delete_line();
+            } else if (E.mode == MODE_NORMAL) {
+                open_help();
+            }
+            break;
+        case 1008:
+            if (E.mode == MODE_INSERT) {
+                delete_line();
+            }
             break;
         case '\x1b':
             if (E.mode == MODE_INSERT) {
