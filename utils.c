@@ -15,7 +15,7 @@
 #include "keybinds.h"
 #include "utils.h"
 
-struct editorConfig E;
+struct Setup E;
 
 void die(const char *s) {
     write(STDOUT_FILENO, "\x1b[2J", 4);

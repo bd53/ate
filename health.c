@@ -13,19 +13,15 @@
 #include "keybinds.h"
 #include "utils.h"
 
-static const char* get_status_icon(enum HealthStatus status) {
-    return (status == HEALTH_INFO) ? "✅" : "⚠️";
-}
-
-static void append_health_line(enum HealthStatus status, const char *format, ...) {
+static void append_health_line(int is_ok, const char *format, ...) {
     char message[500];
     char line[512];
     va_list args;
     va_start(args, format);
     vsnprintf(message, sizeof(message), format, args);
     va_end(args);
-    const char *prefix = (status == HEALTH_INFO) ? "-" : "-";
-    snprintf(line, sizeof(line), "%s %s %s", prefix, get_status_icon(status), message);
+    const char *icon = is_ok ? "✅" : "⚠️";
+    snprintf(line, sizeof(line), "- %s %s", icon, message);
     append_row(line, strlen(line));
 }
 
@@ -93,9 +89,9 @@ static void check_core_utils() {
         const char *cmd = tools[i][0];
         const char *flag = tools[i][1];
         if (check_command(cmd, version, sizeof(version), flag)) {
-            append_health_line(HEALTH_INFO, "OK %s: %s", cmd, version);
+            append_health_line(1, "OK %s: %s", cmd, version);
         } else {
-            append_health_line(HEALTH_WARNING, "%s: not found", cmd);
+            append_health_line(0, "%s: not found", cmd);
         }
     }
 }
@@ -125,9 +121,9 @@ static void check_language_support() {
         const char *cmd = languages[i][1];
         const char *flag = languages[i][2];
         if (check_command(cmd, version, sizeof(version), flag)) {
-            append_health_line(HEALTH_INFO, "OK %s: %s", name, version);
+            append_health_line(1, "OK %s: %s", name, version);
         } else {
-            append_health_line(HEALTH_WARNING, "WARNING %s: not available", name);
+            append_health_line(0, "WARNING %s: not available", name);
             append_advice("spawn: %s failed with exit code - and signal -. Could not find executable \"%s\" in PATH.", cmd, cmd);
             if (i < sizeof(languages) / sizeof(languages[0]) - 1) {
                 append_row("", 0);
@@ -194,9 +190,9 @@ static void check_external_tools() {
                 path[sizeof(path) - 1] = 0;
             }
             check_command(cmd, version, sizeof(version), flag);
-            append_health_line(HEALTH_INFO, "OK %s: %s (%s)", name, version, path);
+            append_health_line(1, "OK %s: %s (%s)", name, version, path);
         } else {
-            append_health_line(HEALTH_WARNING, "WARNING %s: not found", name);
+            append_health_line(0, "WARNING %s: not found", name);
         }
     }
 }
@@ -209,13 +205,13 @@ static void check_clipboard() {
     append_section_header("Clipboard (optional)");
     for (size_t i = 0; i < sizeof(clipboard_tools) / sizeof(clipboard_tools[0]); i++) {
         if (check_command(clipboard_tools[i], NULL, 0, NULL)) {
-            append_health_line(HEALTH_INFO, "OK Clipboard tool found: %s", clipboard_tools[i]);
+            append_health_line(1, "OK Clipboard tool found: %s", clipboard_tools[i]);
             found = 1;
             break;
         }
     }
     if (!found) {
-        append_health_line(HEALTH_WARNING, "WARNING No clipboard tool found");
+        append_health_line(0, "WARNING No clipboard tool found");
         append_advice("Install xclip, xsel, wl-clipboard, or similar.");
     }
 }

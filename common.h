@@ -8,31 +8,15 @@
 #define CTRL_KEY(k) ((k) & 0x1f)
 #define BUFFER_INIT {NULL, 0}
 
-enum editorHighlight {
+enum Highlight {
     HL_NORMAL = 0,
     HL_MATCH,
 };
 
-enum editorKey {
-    ARROW_LEFT = 1000,
-    ARROW_RIGHT,
-    ARROW_UP,
-    ARROW_DOWN,
-    CTRL_ARROW_LEFT,
-    CTRL_ARROW_RIGHT,
-    CTRL_ARROW_UP,
-    CTRL_ARROW_DOWN
-};
-
-enum editorMode {
+enum Mode {
     MODE_NORMAL = 0,
     MODE_INSERT = 1,
     MODE_COMMAND = 2
-};
-
-enum HealthStatus {
-    HEALTH_INFO,
-    HEALTH_WARNING
 };
 
 typedef struct {
@@ -42,33 +26,12 @@ typedef struct {
     int hl_open_comment;
 } erow;
 
-typedef struct {
-    char *category;
-    char *message;
-    enum HealthStatus status;
-} HealthReport;
-
-typedef struct {
-    const char *name;
-    const char *cmd;
-    const char *version_flag;
-    enum HealthStatus found_status;
-    enum HealthStatus missing_status;
-} ToolCheck;
-
-typedef struct {
-    char *name;
-    char *path;
-    int is_dir;
-    int depth;
-} FileEntry;
-
 struct buffer {
     char *b;
     int len;
 };
 
-struct editorConfig {
+struct Setup {
     int cx, cy;
     int rowoff;
     int numrows;
@@ -89,6 +52,6 @@ struct editorConfig {
     int is_file_tree;
 };
 
-extern struct editorConfig E;
+extern struct Setup E;
 
 #endif

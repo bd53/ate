@@ -27,19 +27,19 @@ static int read_esc_sequence() {
     if (seq[0] == '[' && seq[1] == '1') {
         if (read(STDIN_FILENO, &seq[2], 1) == 1 && seq[2] == ';' && read(STDIN_FILENO, &seq[3], 1) == 1 && seq[3] == '5' && read(STDIN_FILENO, &seq[4], 1) == 1) {
             switch (seq[4]) {
-                case 'A': return CTRL_ARROW_UP;
-                case 'B': return CTRL_ARROW_DOWN;
-                case 'C': return CTRL_ARROW_RIGHT;
-                case 'D': return CTRL_ARROW_LEFT;
+                case 'A': return 1006; // CTRL_ARROW_UP
+                case 'B': return 1007; // CTRL_ARROW_DOWN
+                case 'C': return 1001; // CTRL_ARROW_RIGHT
+                case 'D': return 1000; // CTRL_ARROW_LEFT
             }
         }
     }
     if (seq[0] == '[') {
         switch (seq[1]) {
-            case 'A': return ARROW_UP;
-            case 'B': return ARROW_DOWN;
-            case 'C': return ARROW_RIGHT;
-            case 'D': return ARROW_LEFT;
+            case 'A': return 1002; // ARROW_UP
+            case 'B': return 1003; // ARROW_DOWN
+            case 'C': return 1005; // ARROW_RIGHT
+            case 'D': return 1004; // ARROW_LEFT
         }
     }
     return '\x1b';
@@ -59,7 +59,7 @@ void cursor_move(int key) {
     E.match_row = -1;
     E.match_col = -1;
     switch (key) {
-        case ARROW_LEFT:
+        case 1004:
             if (E.cx > 0) {
                 E.cx--;
             } else if (E.cy > 0) {
@@ -69,7 +69,7 @@ void cursor_move(int key) {
                 }
             }
             break;
-        case ARROW_RIGHT:
+        case 1005:
             if (row && E.cx < row->size) {
                 E.cx++;
             } else if (row && E.cx == row->size && E.cy < E.numrows - 1) {
@@ -77,22 +77,22 @@ void cursor_move(int key) {
                 E.cx = 0;
             }
             break;
-        case ARROW_UP:
+        case 1002:
             if (E.cy > 0) E.cy--;
             break;
-        case ARROW_DOWN:
+        case 1003:
             if (E.cy < E.numrows - 1) E.cy++;
             break;
-        case CTRL_ARROW_LEFT:
+        case 1000:
             E.cx = 0;
             break;
-        case CTRL_ARROW_RIGHT:
+        case 1001:
             if (row) E.cx = row->size;
             break;
-        case CTRL_ARROW_UP:
-        case CTRL_ARROW_DOWN: {
+        case 1006:
+        case 1007: {
             int jump = (E.screenrows / 7 < 1) ? 1 : E.screenrows / 7;
-            E.cy += (key == CTRL_ARROW_UP) ? -jump : jump;
+            E.cy += (key == 1006) ? -jump : jump;
             if (E.cy < 0) E.cy = 0;
             if (E.cy >= E.numrows) E.cy = E.numrows - 1;
             break;
@@ -105,10 +105,10 @@ void cursor_move(int key) {
 
 static int translate_key(int key) {
     switch (key) {
-        case 'h': return ARROW_LEFT;
-        case 'j': return ARROW_DOWN;
-        case 'k': return ARROW_UP;
-        case 'l': return ARROW_RIGHT;
+        case 'h': return 1004;
+        case 'j': return 1003;
+        case 'k': return 1002;
+        case 'l': return 1005;
         default: return key;
     }
 }
@@ -139,14 +139,14 @@ static void handle_file_tree(int c) {
         case '\r':
             open_file_tree();
             return;
-        case ARROW_UP:
-        case ARROW_DOWN:
-        case ARROW_LEFT:
-        case ARROW_RIGHT:
-        case CTRL_ARROW_UP:
-        case CTRL_ARROW_DOWN:
-        case CTRL_ARROW_LEFT:
-        case CTRL_ARROW_RIGHT:
+        case 1002:
+        case 1003:
+        case 1004:
+        case 1005:
+        case 1006:
+        case 1007:
+        case 1000:
+        case 1001:
             cursor_move(c);
             break;
         case 'h':
@@ -182,14 +182,14 @@ static void handle_help(int c) {
         case CTRL_KEY('p'):
             toggle_file_tree();
             return;
-        case ARROW_UP:
-        case ARROW_DOWN:
-        case ARROW_LEFT:
-        case ARROW_RIGHT:
-        case CTRL_ARROW_UP:
-        case CTRL_ARROW_DOWN:
-        case CTRL_ARROW_LEFT:
-        case CTRL_ARROW_RIGHT:
+        case 1002:
+        case 1003:
+        case 1004:
+        case 1005:
+        case 1006:
+        case 1007:
+        case 1000:
+        case 1001:
             cursor_move(c);
             break;
         case 'h':
@@ -336,14 +336,14 @@ void process_keypress() {
                 E.mode = MODE_NORMAL;
             }
             break;
-        case ARROW_UP:
-        case ARROW_DOWN:
-        case ARROW_LEFT:
-        case ARROW_RIGHT:
-        case CTRL_ARROW_UP:
-        case CTRL_ARROW_DOWN:
-        case CTRL_ARROW_LEFT:
-        case CTRL_ARROW_RIGHT:
+        case 1002:
+        case 1003:
+        case 1004:
+        case 1005:
+        case 1006:
+        case 1007:
+        case 1000:
+        case 1001:
             cursor_move(c);
             break;
         default:

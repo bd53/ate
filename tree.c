@@ -17,19 +17,28 @@
 #include "tree.h"
 #include "utils.h"
 
-static FileEntry *file_entries = NULL;
+static char **file_names = NULL;
+static char **file_paths = NULL;
+static int *file_is_dir = NULL;
+static int *file_depth = NULL;
 static int num_entries = 0;
 static int entries_capacity = 0;
 
 void free_file_entries() {
     for (int i = 0; i < num_entries; i++) {
-        free(file_entries[i].name);
-        file_entries[i].name = NULL;
-        free(file_entries[i].path);
-        file_entries[i].path = NULL;
+        free(file_names[i]);
+        file_names[i] = NULL;
+        free(file_paths[i]);
+        file_paths[i] = NULL;
     }
-    free(file_entries);
-    file_entries = NULL;
+    free(file_names);
+    free(file_paths);
+    free(file_is_dir);
+    free(file_depth);
+    file_names = NULL;
+    file_paths = NULL;
+    file_is_dir = NULL;
+    file_depth = NULL;
     num_entries = 0;
     entries_capacity = 0;
 }
@@ -40,7 +49,10 @@ static void scan_directory(const char *path, int depth) {
     DIR *dir = opendir(path);
     if (!dir) return;
     struct dirent *entry;
-    FileEntry *temp_entries = NULL;
+    char **temp_names = NULL;
+    char **temp_paths = NULL;
+    int *temp_is_dir = NULL;
+    int *temp_depth = NULL;
     int temp_count = 0;
     int temp_capacity = 0;
     while ((entry = readdir(dir)) != NULL) {
@@ -54,35 +66,49 @@ static void scan_directory(const char *path, int depth) {
         if (stat(full_path, &st) == -1) continue;
         if (temp_count >= temp_capacity) {
             temp_capacity = temp_capacity == 0 ? 32 : temp_capacity * 2;
-            FileEntry *new_entries = realloc(temp_entries, sizeof(FileEntry) * temp_capacity);
-            if (!new_entries) {
+            char **new_names = realloc(temp_names, sizeof(char*) * temp_capacity);
+            char **new_paths = realloc(temp_paths, sizeof(char*) * temp_capacity);
+            int *new_is_dir = realloc(temp_is_dir, sizeof(int) * temp_capacity);
+            int *new_depth = realloc(temp_depth, sizeof(int) * temp_capacity);
+            if (!new_names || !new_paths || !new_is_dir || !new_depth) {
+                char **cleanup_names = new_names ? new_names : temp_names;
+                char **cleanup_paths = new_paths ? new_paths : temp_paths;
                 for (int i = 0; i < temp_count; i++) {
-                    free(temp_entries[i].name);
-                    free(temp_entries[i].path);
+                    if (cleanup_names) free(cleanup_names[i]);
+                    if (cleanup_paths) free(cleanup_paths[i]);
                 }
-                free(temp_entries);
+                if (new_names) free(new_names); else free(temp_names);
+                if (new_paths) free(new_paths); else free(temp_paths);
+                if (new_is_dir) free(new_is_dir); else free(temp_is_dir);
+                if (new_depth) free(new_depth); else free(temp_depth);
                 closedir(dir);
                 free_file_entries();
                 die("realloc");
             }
-            temp_entries = new_entries;
+            temp_names = new_names;
+            temp_paths = new_paths;
+            temp_is_dir = new_is_dir;
+            temp_depth = new_depth;
         }
-        temp_entries[temp_count].name = strdup(entry->d_name);
-        temp_entries[temp_count].path = strdup(full_path);
-        if (!temp_entries[temp_count].name || !temp_entries[temp_count].path) {
-            free(temp_entries[temp_count].name);
-            free(temp_entries[temp_count].path);
+        temp_names[temp_count] = strdup(entry->d_name);
+        temp_paths[temp_count] = strdup(full_path);
+        if (!temp_names[temp_count] || !temp_paths[temp_count]) {
+            free(temp_names[temp_count]);
+            free(temp_paths[temp_count]);
             for (int i = 0; i < temp_count; i++) {
-                free(temp_entries[i].name);
-                free(temp_entries[i].path);
+                free(temp_names[i]);
+                free(temp_paths[i]);
             }
-            free(temp_entries);
+            free(temp_names);
+            free(temp_paths);
+            free(temp_is_dir);
+            free(temp_depth);
             closedir(dir);
             free_file_entries();
             die("strdup");
         }
-        temp_entries[temp_count].is_dir = S_ISDIR(st.st_mode);
-        temp_entries[temp_count].depth = depth;
+        temp_is_dir[temp_count] = S_ISDIR(st.st_mode);
+        temp_depth[temp_count] = depth;
         temp_count++;
     }
     closedir(dir);
@@ -90,43 +116,64 @@ static void scan_directory(const char *path, int depth) {
         for (int i = 0; i < temp_count - 1; i++) {
             for (int j = i + 1; j < temp_count; j++) {
                 int swap = 0;
-                if (temp_entries[i].is_dir && !temp_entries[j].is_dir) {
+                if (temp_is_dir[i] && !temp_is_dir[j]) {
                     swap = 0;
-                } else if (!temp_entries[i].is_dir && temp_entries[j].is_dir) {
+                } else if (!temp_is_dir[i] && temp_is_dir[j]) {
                     swap = 1;
                 } else {
-                    swap = strcmp(temp_entries[i].name, temp_entries[j].name) > 0;
+                    swap = strcmp(temp_names[i], temp_names[j]) > 0;
                 }
                 if (swap) {
-                    FileEntry temp = temp_entries[i];
-                    temp_entries[i] = temp_entries[j];
-                    temp_entries[j] = temp;
+                    char *temp_name = temp_names[i];
+                    temp_names[i] = temp_names[j];
+                    temp_names[j] = temp_name;
+                    char *temp_path = temp_paths[i];
+                    temp_paths[i] = temp_paths[j];
+                    temp_paths[j] = temp_path;
+                    int temp_dir = temp_is_dir[i];
+                    temp_is_dir[i] = temp_is_dir[j];
+                    temp_is_dir[j] = temp_dir;
+                    int temp_dep = temp_depth[i];
+                    temp_depth[i] = temp_depth[j];
+                    temp_depth[j] = temp_dep;
                 }
             }
         }
         for (int i = 0; i < temp_count; i++) {
             if (num_entries >= entries_capacity) {
                 entries_capacity = entries_capacity == 0 ? 64 : entries_capacity * 2;
-                FileEntry *new_entries = realloc(file_entries, sizeof(FileEntry) * entries_capacity);
-                if (!new_entries) {
+                char **new_names = realloc(file_names, sizeof(char*) * entries_capacity);
+                char **new_paths = realloc(file_paths, sizeof(char*) * entries_capacity);
+                int *new_is_dir = realloc(file_is_dir, sizeof(int) * entries_capacity);
+                int *new_depth = realloc(file_depth, sizeof(int) * entries_capacity);
+                if (!new_names || !new_paths || !new_is_dir || !new_depth) {
                     for (int k = 0; k < temp_count; k++) {
-                        free(temp_entries[k].name);
-                        free(temp_entries[k].path);
+                        free(temp_names[k]);
+                        free(temp_paths[k]);
                     }
-                    free(temp_entries);
+                    free(temp_names);
+                    free(temp_paths);
+                    free(temp_is_dir);
+                    free(temp_depth);
                     free_file_entries();
                     die("realloc");
                 }
-                file_entries = new_entries;
+                file_names = new_names;
+                file_paths = new_paths;
+                file_is_dir = new_is_dir;
+                file_depth = new_depth;
             }
-            file_entries[num_entries].name = temp_entries[i].name;
-            file_entries[num_entries].path = temp_entries[i].path;
-            file_entries[num_entries].is_dir = temp_entries[i].is_dir;
-            file_entries[num_entries].depth = temp_entries[i].depth;
+            file_names[num_entries] = temp_names[i];
+            file_paths[num_entries] = temp_paths[i];
+            file_is_dir[num_entries] = temp_is_dir[i];
+            file_depth[num_entries] = temp_depth[i];
             num_entries++;
         }
     }
-    free(temp_entries);
+    free(temp_names);
+    free(temp_paths);
+    free(temp_is_dir);
+    free(temp_depth);
 }
 
 void build_file_tree(const char *root_path) {
@@ -148,14 +195,14 @@ void build_file_tree(const char *root_path) {
     for (int i = 0; i < num_entries; i++) {
         char line[512];
         int offset = 0;
-        for (int d = 0; d < file_entries[i].depth; d++) {
+        for (int d = 0; d < file_depth[i]; d++) {
             line[offset++] = ' ';
             line[offset++] = ' ';
         }
-        if (file_entries[i].is_dir) {
-            snprintf(line + offset, sizeof(line) - offset, "%s/", file_entries[i].name);
+        if (file_is_dir[i]) {
+            snprintf(line + offset, sizeof(line) - offset, "%s/", file_names[i]);
         } else {
-            snprintf(line + offset, sizeof(line) - offset, "%s", file_entries[i].name);
+            snprintf(line + offset, sizeof(line) - offset, "%s", file_names[i]);
         }
         append_row(line, strlen(line));
     }
@@ -183,9 +230,8 @@ void open_file_tree() {
     if (E.cy < 4) return;
     int entry_index = E.cy - 4;
     if (entry_index < 0 || entry_index >= num_entries) return;
-    FileEntry *entry = &file_entries[entry_index];
-    if (entry->is_dir) {
-        if (chdir(entry->path) == 0) {
+    if (file_is_dir[entry_index]) {
+        if (chdir(file_paths[entry_index]) == 0) {
             build_file_tree(NULL);
             E.cx = 0;
             E.cy = 0;
@@ -194,7 +240,7 @@ void open_file_tree() {
     } else {
         E.is_file_tree = 0;
         E.is_help_view = 0;
-        open_editor(entry->path);
+        open_editor(file_paths[entry_index]);
         if (E.numrows == 0) {
             append_row("", 0);
         }
