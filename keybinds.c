@@ -131,6 +131,7 @@ static int translate_key(int key) {
 static void handle_quit() {
     write(STDOUT_FILENO, "\x1b[2J", 4);
     write(STDOUT_FILENO, "\x1b[H", 3);
+    free_workspace_search();
     run_cleanup();
     exit(0);
 }
@@ -235,16 +236,16 @@ static void handle_normal_mode(int c) {
             open_file();
             return;
         case CTRL_KEY('f'):
-            toggle_find();
+            toggle_workspace_find();
             return;
         case CTRL_KEY('s'):
             save_editor();
             return;
         case 'n':
-            find_next(1);
+            workspace_find_next(1);
             return;
-        case 'N':
-            find_next(-1);
+        case 'b':
+            workspace_find_next(-1);
             return;
         case 'i':
             E.mode = MODE_INSERT;

@@ -5,6 +5,7 @@
 
 #include "common.h"
 #include "content.h"
+#include "search.h"
 #include "tree.h"
 #include "utils.h"
 
@@ -109,6 +110,7 @@ void run_cleanup() {
     }
     free_rows();
     free_file_entries();
+    free_workspace_search();
 }
 
 void insert_row(int at, char *s, size_t len) {
