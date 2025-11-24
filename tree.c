@@ -6,12 +6,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "common.h"
-#include "content.h"
-#include "display.h"
-#include "file.h"
-#include "tree.h"
-#include "utils.h"
+#include "efunc.h"
+#include "estruct.h"
+#include "util.h"
 
 static char **file_names = NULL;
 static char **file_paths = NULL;
@@ -204,7 +201,7 @@ void build_file_tree(const char *root_path) {
 
 void open_file_tree() {
     if (Editor.cursor_y < 0 || Editor.cursor_y >= Editor.buffer_rows) return;
-    Row *current_row = &Editor.row[Editor.cursor_y];
+    struct Row *current_row = &Editor.row[Editor.cursor_y];
     char *row_content = current_row->chars;
     if (Editor.cursor_y == 3 && current_row->size >= 2 && strncmp(row_content, "../", 3) == 0) {
         char cwd[1024];

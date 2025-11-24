@@ -6,9 +6,8 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-#include "common.h"
-#include "keybinds.h"
-#include "utils.h"
+#include "ebind.h"
+#include "util.h"
 
 void run_cleanup() {
     if (Editor.query) {
@@ -25,30 +24,6 @@ void die(const char *s) {
     write(STDOUT_FILENO, "\x1b[H", 3);
     perror(s);
     exit(1);
-}
-
-void disable_raw_mode() {
-    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &Editor.original) == -1) die("tcsetattr");
-    write(STDOUT_FILENO, "\x1b[?1049l", 8);
-    write(STDOUT_FILENO, "\x1b[?1000l", 9);
-    write(STDOUT_FILENO, "\x1b[?1002l", 9);
-    write(STDOUT_FILENO, "\x1b[?1003l", 9);
-}
-
-void enable_raw_mode() {
-    if (tcgetattr(STDIN_FILENO, &Editor.original) == -1) die("tcgetattr");
-    atexit(disable_raw_mode);
-    Termios raw = Editor.original;
-    raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
-    raw.c_oflag &= ~(OPOST);
-    raw.c_cflag |= (CS8);
-    raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
-    raw.c_cc[VMIN] = 0;
-    raw.c_cc[VTIME] = 1;
-    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) die("tcsetattr");
-    write(STDOUT_FILENO, "\x1b[?1000l", 9);
-    write(STDOUT_FILENO, "\x1b[?1002l", 9);
-    write(STDOUT_FILENO, "\x1b[?1003l", 9);
 }
 
 int get_cursor_position(int *rows, int *cols) {
@@ -80,7 +55,7 @@ int get_window_size(int *rows, int *cols) {
     }
 }
 
-void append(buffer *ab, const char *s, int len) {
+void append(struct Buffer *ab, const char *s, int len) {
     if (ab == NULL || s == NULL || len < 0) return;
     if (len == 0) return;
     char *new = realloc(ab->b, ab->length + len);
@@ -114,7 +89,7 @@ char *trim_whitespace(char *str) {
 
 void trim_leadingspace(int num_spaces) {
     if (Editor.cursor_y < 0 || Editor.cursor_y >= Editor.buffer_rows) return;
-    Row *row = &Editor.row[Editor.cursor_y];
+    struct Row *row = &Editor.row[Editor.cursor_y];
     int spaces_to_remove = 0;
     for (int i = 0; i < row->size && i < num_spaces; i++) {
         if (row->chars[i] == ' ') {

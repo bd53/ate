@@ -3,12 +3,8 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "common.h"
-#include "content.h"
-#include "display.h"
-#include "file.h"
-#include "tree.h"
-#include "utils.h"
+#include "efunc.h"
+#include "util.h"
 
 void save_file() {
     if (Editor.filename == NULL) {

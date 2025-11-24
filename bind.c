@@ -5,64 +5,58 @@
 #include <strings.h>
 #include <unistd.h>
 
-#include "common.h"
-#include "command.h"
-#include "content.h"
-#include "display.h"
-#include "file.h"
-#include "keybinds.h"
-#include "search.h"
-#include "tree.h"
+#include "ebind.h"
+#include "efunc.h"
 #include "utf8.h"
-#include "utils.h"
+#include "util.h"
 
 static int read_esc_sequence() {
     char seq[5];
-    if (read(STDIN_FILENO, &seq[0], 1) != 1) return '\x1b';
-    if (read(STDIN_FILENO, &seq[1], 1) != 1) return '\x1b';
+    if (read(STDIN_FILENO, &seq[0], 1) != 1) return KEY_ESCAPE;
+    if (read(STDIN_FILENO, &seq[1], 1) != 1) return KEY_ESCAPE;
     if (seq[0] == '[' && seq[1] == '1') {
         if (read(STDIN_FILENO, &seq[2], 1) == 1 && seq[2] == ';' && read(STDIN_FILENO, &seq[3], 1) == 1 && seq[3] == '5' && read(STDIN_FILENO, &seq[4], 1) == 1) {
             switch (seq[4]) {
-                case 'A': return 1006; // CTRL_ARROW_UP
-                case 'B': return 1007; // CTRL_ARROW_DOWN
-                case 'C': return 1001; // CTRL_ARROW_RIGHT
-                case 'D': return 1000; // CTRL_ARROW_LEFT
+                case 'A': return KEY_CTRL_ARROW_UP;
+                case 'B': return KEY_CTRL_ARROW_DOWN;
+                case 'C': return KEY_CTRL_ARROW_RIGHT;
+                case 'D': return KEY_CTRL_ARROW_LEFT;
             }
         }
     }
     if (seq[0] == '[') {
         switch (seq[1]) {
-            case 'A': return 1002; // ARROW_UP
-            case 'B': return 1003; // ARROW_DOWN
-            case 'C': return 1005; // ARROW_RIGHT
-            case 'D': return 1004; // ARROW_LEFT
+            case 'A': return KEY_ARROW_UP;
+            case 'B': return KEY_ARROW_DOWN;
+            case 'C': return KEY_ARROW_RIGHT;
+            case 'D': return KEY_ARROW_LEFT;
             case '3':
                 if (read(STDIN_FILENO, &seq[2], 1) == 1) {
                     if (seq[2] == ';') {
                         if (read(STDIN_FILENO, &seq[3], 1) == 1 && seq[3] == '5' && read(STDIN_FILENO, &seq[4], 1) == 1 && seq[4] == '~') {
-                            return 1008; // CTRL_BACKSPACE
+                            return KEY_CTRL_BACKSPACE;
                         }
                     }
                 }
                 break;
         }
     }
-    return '\x1b';
+    return KEY_ESCAPE;
 }
 
 int input_read_key() {
     int nread;
     char c;
     while ((nread = read(STDIN_FILENO, &c, 1)) != 1) if (nread == -1 && errno != EAGAIN) die("read");
-    return (c == '\x1b') ? read_esc_sequence() : c;
+    return (c == KEY_ESCAPE) ? read_esc_sequence() : c;
 }
 
 void cursor_move(int key) {
-    Row *row = (Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) ? &Editor.row[Editor.cursor_y] : NULL;
+    struct Row *row = (Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) ? &Editor.row[Editor.cursor_y] : NULL;
     Editor.found_row = -1;
     Editor.found_col = -1;
     switch (key) {
-        case 1004:
+        case KEY_ARROW_LEFT:
             if (Editor.cursor_x > 0) {
                 if (row) {
                     Editor.cursor_x = utf8_prev_char_boundary(row->chars, Editor.cursor_x);
@@ -74,7 +68,7 @@ void cursor_move(int key) {
                 if (Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) Editor.cursor_x = Editor.row[Editor.cursor_y].size;
             }
             break;
-        case 1005:
+        case KEY_ARROW_RIGHT:
             if (row && Editor.cursor_x < row->size) {
                 Editor.cursor_x = utf8_next_char_boundary(row->chars, Editor.cursor_x, row->size);
             } else if (row && Editor.cursor_x == row->size && Editor.cursor_y < Editor.buffer_rows - 1) {
@@ -82,22 +76,22 @@ void cursor_move(int key) {
                 Editor.cursor_x = 0;
             }
             break;
-        case 1002:
+        case KEY_ARROW_UP:
             if (Editor.cursor_y > 0) Editor.cursor_y--;
             break;
-        case 1003:
+        case KEY_ARROW_DOWN:
             if (Editor.cursor_y < Editor.buffer_rows - 1) Editor.cursor_y++;
             break;
-        case 1000:
+        case KEY_CTRL_ARROW_LEFT:
             Editor.cursor_x = 0;
             break;
-        case 1001:
+        case KEY_CTRL_ARROW_RIGHT:
             if (row) Editor.cursor_x = row->size;
             break;
-        case 1006:
-        case 1007: {
+        case KEY_CTRL_ARROW_UP:
+        case KEY_CTRL_ARROW_DOWN: {
             int jump = (Editor.editor_rows / 7 < 1) ? 1 : Editor.editor_rows / 7;
-            Editor.cursor_y += (key == 1006) ? -jump : jump;
+            Editor.cursor_y += (key == KEY_CTRL_ARROW_UP) ? -jump : jump;
             if (Editor.cursor_y < 0) Editor.cursor_y = 0;
             if (Editor.cursor_y >= Editor.buffer_rows) Editor.cursor_y = Editor.buffer_rows - 1;
             break;
@@ -114,10 +108,10 @@ void cursor_move(int key) {
 
 static int translate_key(int key) {
     switch (key) {
-        case 'h': return 1004;
-        case 'j': return 1003;
-        case 'k': return 1002;
-        case 'l': return 1005;
+        case KEY_MOVE_LEFT: return KEY_ARROW_LEFT;
+        case KEY_MOVE_DOWN: return KEY_ARROW_DOWN;
+        case KEY_MOVE_UP: return KEY_ARROW_UP;
+        case KEY_MOVE_RIGHT: return KEY_ARROW_RIGHT;
         default: return key;
     }
 }
@@ -132,37 +126,35 @@ static void handle_quit() {
 
 static void handle_file_tree(int c) {
     switch (c) {
-        case CTRL_KEY('q'):
+        case KEY_QUIT:
             handle_quit();
             break;
-        case CTRL_KEY('p'):
-            toggle_file_tree();
-            return;
+        case KEY_TOGGLE_FILE_TREE:
+        case KEY_ESCAPE:
         case 'q':
-        case '\x1b':
             toggle_file_tree();
             return;
-        case ':':
-            Editor.mode = MODE_COMMAND;
+        case KEY_COMMAND_MODE:
+            Editor.mode = 2;
             command_mode();
             return;
-        case '\r':
+        case KEY_ENTER:
             open_file_tree();
             return;
-        case 1002:
-        case 1003:
-        case 1004:
-        case 1005:
-        case 1006:
-        case 1007:
-        case 1000:
-        case 1001:
+        case KEY_ARROW_UP:
+        case KEY_ARROW_DOWN:
+        case KEY_ARROW_LEFT:
+        case KEY_ARROW_RIGHT:
+        case KEY_CTRL_ARROW_UP:
+        case KEY_CTRL_ARROW_DOWN:
+        case KEY_CTRL_ARROW_LEFT:
+        case KEY_CTRL_ARROW_RIGHT:
             cursor_move(c);
             break;
-        case 'h':
-        case 'j':
-        case 'k':
-        case 'l':
+        case KEY_MOVE_LEFT:
+        case KEY_MOVE_DOWN:
+        case KEY_MOVE_UP:
+        case KEY_MOVE_RIGHT:
             cursor_move(translate_key(c));
             break;
     }
@@ -171,39 +163,39 @@ static void handle_file_tree(int c) {
 
 static void handle_help(int c) {
     switch (c) {
-        case CTRL_KEY('q'):
+        case KEY_QUIT:
             handle_quit();
             break;
+        case KEY_ESCAPE:
         case 'q':
-        case '\x1b':
             run_cleanup();
             Editor.help_view = 0;
             if (Editor.buffer_rows == 0) append_row("", 0);
             break;
-        case ':':
-            Editor.mode = MODE_COMMAND;
+        case KEY_COMMAND_MODE:
+            Editor.mode = 2;
             command_mode();
             return;
-        case CTRL_KEY('h'):
+        case KEY_TOGGLE_HELP:
             open_help();
             return;
-        case CTRL_KEY('p'):
+        case KEY_TOGGLE_FILE_TREE:
             toggle_file_tree();
             return;
-        case 1002:
-        case 1003:
-        case 1004:
-        case 1005:
-        case 1006:
-        case 1007:
-        case 1000:
-        case 1001:
+        case KEY_ARROW_UP:
+        case KEY_ARROW_DOWN:
+        case KEY_ARROW_LEFT:
+        case KEY_ARROW_RIGHT:
+        case KEY_CTRL_ARROW_UP:
+        case KEY_CTRL_ARROW_DOWN:
+        case KEY_CTRL_ARROW_LEFT:
+        case KEY_CTRL_ARROW_RIGHT:
             cursor_move(c);
             break;
-        case 'h':
-        case 'j':
-        case 'k':
-        case 'l':
+        case KEY_MOVE_LEFT:
+        case KEY_MOVE_DOWN:
+        case KEY_MOVE_UP:
+        case KEY_MOVE_RIGHT:
             cursor_move(translate_key(c));
             break;
     }
@@ -212,46 +204,46 @@ static void handle_help(int c) {
 
 static void handle_normal_mode(int c) {
     switch (c) {
-        case '\r':
+        case KEY_ENTER:
             break;
-        case ':':
-            Editor.mode = MODE_COMMAND;
+        case KEY_COMMAND_MODE:
+            Editor.mode = 2;
             command_mode();
             return;
-        case CTRL_KEY('h'):
+        case KEY_TOGGLE_HELP:
             open_help();
             return;
-        case CTRL_KEY('p'):
+        case KEY_TOGGLE_FILE_TREE:
             toggle_file_tree();
             return;
-        case CTRL_KEY('o'):
+        case KEY_OPEN_FILE:
             open_file();
             return;
-        case CTRL_KEY('f'):
-            toggle_workspace_find();
-            return;
-        case CTRL_KEY('s'):
+        case KEY_SAVE_FILE:
             save_file();
             return;
-        case 'n':
+        case KEY_TOGGLE_FIND:
+            toggle_workspace_find();
+            return;
+        case KEY_FIND_NEXT:
             workspace_find_next(1);
             return;
-        case 'b':
+        case KEY_FIND_PREV:
             workspace_find_next(-1);
             return;
-        case 'i':
-            Editor.mode = MODE_INSERT;
+        case KEY_INSERT_MODE_ENTER:
+            Editor.mode = 1;
             break;
-        case 'y':
+        case KEY_YANK_LINE:
             yank_line();
             break;
-        case 'h':
-        case 'j':
-        case 'k':
-        case 'l':
+        case KEY_MOVE_LEFT:
+        case KEY_MOVE_DOWN:
+        case KEY_MOVE_UP:
+        case KEY_MOVE_RIGHT:
             cursor_move(translate_key(c));
             break;
-        case 'd':
+        case KEY_DELETE_LINE:
             delete_line();
             break;
     }
@@ -259,19 +251,19 @@ static void handle_normal_mode(int c) {
 
 static void handle_insert_mode(int c) {
     switch (c) {
-        case '\r':
+        case KEY_ENTER:
             Editor.modified = 1;
             insert_new_line();
             break;
-        case '\t':
+        case KEY_TAB:
             Editor.modified = 1;
             for (int i = 0; i < 4; i++) insert_character(' ');
             break;
-        case 127:
+        case KEY_BACKSPACE_ASCII:
             delete_character();
             break;
-        case 8:
-        case 1008:
+        case KEY_BACKSPACE_ALT:
+        case KEY_CTRL_BACKSPACE:
             delete_line();
             break;
         default:
@@ -313,47 +305,47 @@ void process_keypress() {
         return;
     }
     switch (c) {
-        case CTRL_KEY('q'):
+        case KEY_QUIT:
             handle_quit();
             break;
-        case CTRL_KEY('p'):
-            toggle_file_tree();
+        case KEY_TOGGLE_FILE_TREE:
+            if (Editor.mode == 0) toggle_file_tree();
             break;
-        case 8:
-            if (Editor.mode == MODE_INSERT) {
+        case KEY_BACKSPACE_ALT:
+            if (Editor.mode == 1) {
                 delete_line();
-            } else if (Editor.mode == MODE_NORMAL) {
+            } else if (Editor.mode == 0) {
                 open_help();
             }
             break;
-        case 1008:
-            if (Editor.mode == MODE_INSERT) delete_line();
+        case KEY_CTRL_BACKSPACE:
+            if (Editor.mode == 1) delete_line();
             break;
-        case '\x1b':
-            if (Editor.mode == MODE_INSERT) {
-                Editor.mode = MODE_NORMAL;
+        case KEY_ESCAPE:
+            if (Editor.mode == 1) {
+                Editor.mode = 0;
                 if (Editor.cursor_x > 0 && Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) {
-                    Row *row = &Editor.row[Editor.cursor_y];
+                    struct Row *row = &Editor.row[Editor.cursor_y];
                     Editor.cursor_x = utf8_prev_char_boundary(row->chars, Editor.cursor_x);
                 }
-            } else if (Editor.mode == MODE_COMMAND) {
-                Editor.mode = MODE_NORMAL;
+            } else if (Editor.mode == 2) {
+                Editor.mode = 0;
             }
             break;
-        case 1002:
-        case 1003:
-        case 1004:
-        case 1005:
-        case 1006:
-        case 1007:
-        case 1000:
-        case 1001:
+        case KEY_ARROW_UP:
+        case KEY_ARROW_DOWN:
+        case KEY_ARROW_LEFT:
+        case KEY_ARROW_RIGHT:
+        case KEY_CTRL_ARROW_UP:
+        case KEY_CTRL_ARROW_DOWN:
+        case KEY_CTRL_ARROW_LEFT:
+        case KEY_CTRL_ARROW_RIGHT:
             cursor_move(c);
             break;
         default:
-            if (Editor.mode == MODE_NORMAL) {
+            if (Editor.mode == 0) {
                 handle_normal_mode(c);
-            } else if (Editor.mode == MODE_INSERT) {
+            } else if (Editor.mode == 1) {
                 handle_insert_mode(c);
             }
             break;

@@ -4,17 +4,10 @@
 #include <unistd.h>
 #include <limits.h>
 
-#include "common.h"
-#include "content.h"
-#include "display.h"
-#include "search.h"
-#include "tree.h"
+#include "ebind.h"
+#include "efunc.h"
 #include "utf8.h"
-#include "utils.h"
-
-// for those who want to use 8
-// tabs you can have a blast!
-#define INDENT_SIZE 4
+#include "util.h"
 
 void free_rows() {
     for (int j = 0; j < Editor.buffer_rows; j++) {
@@ -32,10 +25,10 @@ void free_rows() {
 
 void insert_row(int at, char *s, size_t len) {
     if (at < 0 || at > Editor.buffer_rows) return;
-    Row *new_rows = realloc(Editor.row, sizeof(Row) * (Editor.buffer_rows + 1));
+    struct Row *new_rows = realloc(Editor.row, sizeof(struct Row) * (Editor.buffer_rows + 1));
     if (!new_rows) die("realloc");
     Editor.row = new_rows;
-    memmove(&Editor.row[at + 1], &Editor.row[at], sizeof(Row) * (Editor.buffer_rows - at));
+    memmove(&Editor.row[at + 1], &Editor.row[at], sizeof(struct Row) * (Editor.buffer_rows - at));
     Editor.row[at].size = len;
     Editor.row[at].chars = malloc(len + 1);
     if (!Editor.row[at].chars) die("malloc");
@@ -45,7 +38,7 @@ void insert_row(int at, char *s, size_t len) {
     Editor.row[at].state = malloc(hl_size);
     if (!Editor.row[at].state) {
         free(Editor.row[at].chars);
-        memmove(&Editor.row[at], &Editor.row[at + 1], sizeof(Row) * (Editor.buffer_rows - at));
+        memmove(&Editor.row[at], &Editor.row[at + 1], sizeof(struct Row) * (Editor.buffer_rows - at));
         die("malloc");
     }
     memset(Editor.row[at].state, 0, hl_size);
@@ -54,7 +47,7 @@ void insert_row(int at, char *s, size_t len) {
 
 void append_row(char *s, size_t len) {
     if (len > 0 && s[len - 1] == '\n') len--;
-    Row *new_rows = realloc(Editor.row, sizeof(Row) * (Editor.buffer_rows + 1));
+    struct Row *new_rows = realloc(Editor.row, sizeof(struct Row) * (Editor.buffer_rows + 1));
     if (new_rows == NULL) die("realloc");
     Editor.row = new_rows;
     int at = Editor.buffer_rows;
@@ -75,17 +68,17 @@ void append_row(char *s, size_t len) {
 
 void delete_row(int at) {
     if (at < 0 || at >= Editor.buffer_rows) return;
-    Row *row = &Editor.row[at];
+    struct Row *row = &Editor.row[at];
     free(row->chars);
     free(row->state);
-    memmove(&Editor.row[at], &Editor.row[at + 1], sizeof(Row) * (Editor.buffer_rows - at - 1));
+    memmove(&Editor.row[at], &Editor.row[at + 1], sizeof(struct Row) * (Editor.buffer_rows - at - 1));
     Editor.buffer_rows--;
     if (Editor.buffer_rows == 0) {
         free(Editor.row);
         Editor.row = NULL;
         Editor.cursor_y = 0;
     } else {
-        Row *new_rows = realloc(Editor.row, sizeof(Row) * Editor.buffer_rows);
+        struct Row *new_rows = realloc(Editor.row, sizeof(struct Row) * Editor.buffer_rows);
         if (new_rows) Editor.row = new_rows;
         if (Editor.cursor_y >= Editor.buffer_rows) Editor.cursor_y = Editor.buffer_rows - 1;
     }
@@ -95,7 +88,7 @@ void delete_row(int at) {
 
 void insert_character(char c) {
     if (Editor.cursor_y == Editor.buffer_rows) append_row("", 0);
-    Row *row = &Editor.row[Editor.cursor_y];
+    struct Row *row = &Editor.row[Editor.cursor_y];
     if (Editor.cursor_x < 0) Editor.cursor_x = 0;
     if (Editor.cursor_x > row->size) Editor.cursor_x = row->size;
     if (!utf8_is_char_boundary(row->chars, Editor.cursor_x)) Editor.cursor_x = utf8_prev_char_boundary(row->chars, Editor.cursor_x);
@@ -143,7 +136,7 @@ void insert_new_line() {
     int add_extra_indent = 0;
     char *second_half = NULL;
     int second_half_len = 0;
-    Row *current_row = NULL;
+    struct Row *current_row = NULL;
     if (Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) {
         current_row = &Editor.row[Editor.cursor_y];
         indent_spaces = leading_whitespace(current_row->chars, current_row->size);
@@ -152,7 +145,7 @@ void insert_new_line() {
     if (Editor.cursor_y == Editor.buffer_rows) {
         append_row("", 0);
     } else {
-        Row *row = &Editor.row[Editor.cursor_y];
+        struct Row *row = &Editor.row[Editor.cursor_y];
         int split_at = Editor.cursor_x;
         if (split_at < 0) split_at = 0;
         if (split_at > row->size) split_at = row->size;
@@ -206,7 +199,7 @@ void insert_new_line() {
 
 void auto_dedent() {
     if (Editor.cursor_y < 0 || Editor.cursor_y >= Editor.buffer_rows) return;
-    Row *row = &Editor.row[Editor.cursor_y];
+    struct Row *row = &Editor.row[Editor.cursor_y];
     int only_whitespace = 1;
     for (int i = 0; i < Editor.cursor_x - 1; i++) {
         if (row->chars[i] != ' ' && row->chars[i] != '\t') {
@@ -228,8 +221,8 @@ void delete_character() {
     if (Editor.cursor_x == 0) {
         if (Editor.cursor_y == 0) return;
         Editor.cursor_y--;
-        Row *row = &Editor.row[Editor.cursor_y];
-        Row *next_row = &Editor.row[Editor.cursor_y + 1];
+        struct Row *row = &Editor.row[Editor.cursor_y];
+        struct Row *next_row = &Editor.row[Editor.cursor_y + 1];
         Editor.cursor_x = row->size;
         char *new_chars = realloc(row->chars, row->size + next_row->size + 1);
         if (!new_chars) die("realloc");
@@ -244,7 +237,7 @@ void delete_character() {
         delete_row(Editor.cursor_y + 1);
         Editor.modified = 1;
     } else {
-        Row *row = &Editor.row[Editor.cursor_y];
+        struct Row *row = &Editor.row[Editor.cursor_y];
         int prev_pos = utf8_prev_char_boundary(row->chars, Editor.cursor_x);
         int char_len = Editor.cursor_x - prev_pos;
         memmove(&row->chars[prev_pos], &row->chars[Editor.cursor_x], row->size - Editor.cursor_x + 1);
@@ -261,7 +254,7 @@ void delete_character() {
 
 void yank_line() {
     if (Editor.cursor_y < 0 || Editor.cursor_y >= Editor.buffer_rows) return;
-    Row *row = &Editor.row[Editor.cursor_y];
+    struct Row *row = &Editor.row[Editor.cursor_y];
     char header[] = "\x1b]52;c;";
     char trailer[] = "\x07";
     static const char b64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -291,7 +284,7 @@ void yank_line() {
 
 void delete_line() {
     if (Editor.buffer_rows > 0 && Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) {
-        Row *row = &Editor.row[Editor.cursor_y];
+        struct Row *row = &Editor.row[Editor.cursor_y];
         char saved_line[512];
         int display_len = (row->size > 50) ? 50 : row->size;
         snprintf(saved_line, sizeof(saved_line), "%.*s%s", display_len, row->chars, (row->size > 50) ? "..." : "");
@@ -310,7 +303,7 @@ void delete_line() {
     }
 }
 
-void draw_content(buffer *ab) {
+void draw_content(struct Buffer *ab) {
     if (!ab) return;
     if (!Editor.row && Editor.buffer_rows > 0) return;
     int file_content_rows = Editor.editor_rows;
@@ -324,7 +317,7 @@ void draw_content(buffer *ab) {
     int content_width = Editor.editor_cols - Editor.gutter_width;
     int screen_row = 0;
     for (int filerow = Editor.row_offset; filerow < Editor.buffer_rows && screen_row < file_content_rows; filerow++) {
-        Row *row = &Editor.row[filerow];
+        struct Row *row = &Editor.row[filerow];
         int wrapped_lines = (row->size + content_width - 1) / content_width;
         if (wrapped_lines == 0) wrapped_lines = 1;
         for (int wrap_line = 0; wrap_line < wrapped_lines && screen_row < file_content_rows; wrap_line++, screen_row++) {
@@ -333,7 +326,7 @@ void draw_content(buffer *ab) {
             if (!Editor.file_tree) {
                 append(ab, "\x1b[38;5;244m", 11);
                 if (wrap_line == 0) {
-                    if (Editor.mode == MODE_NORMAL) {
+                    if (Editor.mode == 0) {
                         if (filerow == Editor.cursor_y) {
                             append(ab, "\x1b[33m", 5);
                             line_num_len = snprintf(line_num_buf, sizeof(line_num_buf), "%*s ", Editor.gutter_width - 1, ">>");
@@ -393,5 +386,144 @@ void draw_content(buffer *ab) {
         append(ab, "\x1b[K", 3);
         append(ab, "\r\n", 2);
         screen_row++;
+    }
+}
+
+void execute_command(char *cmd) {
+    if (cmd == NULL || strlen(cmd) == 0) return;
+    cmd = trim_whitespace(cmd);
+    if (cmd == NULL || strlen(cmd) == 0) return;
+    if (strcmp(cmd, "q") == 0) {
+        run_cleanup();
+        Editor.file_tree = 0;
+        Editor.help_view = 0;
+        if (Editor.buffer_rows == 0) append_row("", 0);
+        Editor.cursor_x = 0;
+        Editor.cursor_y = 0;
+        Editor.row_offset = 0;
+        Editor.modified = 0;
+        refresh_screen();
+        return;
+    }
+    else if (strcmp(cmd, "quit") == 0) {
+        write(STDOUT_FILENO, "\x1b[2J", 4);
+        write(STDOUT_FILENO, "\x1b[H", 3);
+        run_cleanup();
+        exit(0);
+    }
+    else if (strcmp(cmd, "Ex") == 0) {
+        toggle_file_tree();
+    }
+    else if (strcmp(cmd, "bd") == 0) {
+        if (Editor.file_tree) toggle_file_tree();
+    }
+    else if (strncmp(cmd, "w", 1) == 0) {
+        char *arg = NULL;
+        if (strcmp(cmd, "w") == 0 || strcmp(cmd, "write") == 0) {
+            arg = NULL;
+        } else {
+            if (strncmp(cmd, "w ", 2) == 0) arg = cmd + 2;
+            else if (strncmp(cmd, "write ", 6) == 0) arg = cmd + 6;
+        }
+        if (arg) {
+            arg = trim_whitespace(arg);
+            if (arg && *arg) {
+                char *new_filename = strdup(arg);
+                if (!new_filename) die("strdup");
+                if (Editor.filename) {
+                    free(Editor.filename);
+                    Editor.filename = NULL;
+                }
+                Editor.filename = new_filename;
+            }
+        }
+        if (Editor.filename == NULL) {
+            char *filename = prompt("Save as: %s (ESC to cancel)");
+            if (!filename) {
+                refresh_screen();
+                return;
+            }
+            Editor.filename = filename;
+        }
+        save_file();
+    }
+    else if (strcmp(cmd, "help") == 0) {
+        open_help();
+    }
+    else if (strcmp(cmd, "checkhealth") == 0) {
+        check_health();
+    }
+    else {
+        char error_msg[256];
+        snprintf(error_msg, sizeof(error_msg), "E182: Not an editor command: '%s'", cmd);
+        display_message(2, error_msg);
+        input_read_key();
+        refresh_screen();
+    }
+}
+
+void command_mode() {
+    size_t bufsize = 256;
+    char *buf = malloc(bufsize);
+    if (!buf) die("malloc");
+    size_t buflen = 0;
+    buf[0] = '\0';
+    int prompt_row = Editor.editor_rows + 2;
+    while(1) {
+        scroll_editor();
+        struct Buffer ab = BUFFER_INIT;
+        append(&ab, "\x1b[?25l", 6);
+        append(&ab, "\x1b[H", 3);
+        draw_content(&ab);
+        draw_status(&ab);
+        char pos_buf[32];
+        snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;1H", prompt_row);
+        append(&ab, pos_buf, strlen(pos_buf));
+        append(&ab, "\x1b[K", 3);
+        append(&ab, ":", 1);
+        append(&ab, buf, buflen);
+        int cursor_col = buflen + 2;
+        snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;%dH", prompt_row, cursor_col);
+        append(&ab, pos_buf, strlen(pos_buf));
+        append(&ab, "\x1b[?25h", 6);
+        if (write(STDOUT_FILENO, ab.b, ab.length) == -1) {
+            free(ab.b);
+            free(buf);
+            die("write");
+        }
+        free(ab.b);
+        int c = input_read_key();
+        if (c == '\r') {
+            Editor.mode = 0;
+            if (buflen > 0) execute_command(buf);
+            free(buf);
+            refresh_screen();
+            return;
+        } else if (c == '\x1b') {
+            Editor.mode = 0;
+            free(buf);
+            refresh_screen();
+            return;
+        } else if (c == 127 || c == CTRL_KEY('h')) {
+            if (buflen > 0) {
+                buflen--;
+                buf[buflen] = '\0';
+            }
+        } else if (c >= 32 && c < 127) {
+            if (buflen < bufsize - 1) {
+                buf[buflen++] = c;
+                buf[buflen] = '\0';
+            } else {
+                bufsize *= 2;
+                char *new_buf = realloc(buf, bufsize);
+                if (new_buf == NULL) {
+                    free(buf);
+                    die("realloc");
+                }
+                buf = new_buf;
+                buf[buflen++] = c;
+                buf[buflen] = '\0';
+            }
+        }
     }
 }

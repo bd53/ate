@@ -5,11 +5,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "common.h"
-#include "display.h"
-#include "file.h"
-#include "search.h"
-#include "utils.h"
+#include "efunc.h"
+#include "util.h"
 
 static char **filepaths = NULL;
 static int *rows = NULL;

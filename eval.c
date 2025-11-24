@@ -6,12 +6,9 @@
 #include <sys/utsname.h>
 #include <unistd.h>
 
-#include "common.h"
-#include "content.h"
-#include "display.h"
-#include "health.h"
-#include "keybinds.h"
-#include "utils.h"
+#include "ebind.h"
+#include "efunc.h"
+#include "util.h"
 
 static void append_health_line(int is_ok, const char *format, ...) {
     char message[500];

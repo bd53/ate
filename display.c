@@ -3,11 +3,9 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "common.h"
-#include "content.h"
-#include "display.h"
-#include "keybinds.h"
-#include "utils.h"
+#include "ebind.h"
+#include "efunc.h"
+#include "util.h"
 
 int open_editor(char *filename) {
     if (filename == NULL) return -1;
@@ -72,70 +70,7 @@ void scroll_editor() {
     if (Editor.cursor_y >= Editor.row_offset + Editor.editor_rows) Editor.row_offset = Editor.cursor_y - Editor.editor_rows + 1;
 }
 
-char *prompt(const char *prompt) {
-    if (prompt == NULL) return NULL;
-    size_t bufsize = 256;
-    char *buf = malloc(bufsize);
-    if (!buf) die("malloc");
-    size_t buflen = 0;
-    buf[0] = '\0';
-    int prompt_row = Editor.editor_rows + 2;
-    char static_prompt[256];
-    strncpy(static_prompt, prompt, sizeof(static_prompt) - 1);
-    static_prompt[sizeof(static_prompt) - 1] = '\0';
-    char *format_pos = strstr(static_prompt, "%s");
-    if (format_pos) *format_pos = '\0';
-    int prompt_len = strlen(static_prompt);
-    while(1) {
-        buffer ab = BUFFER_INIT;
-        char pos_buf[32];
-        snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;1H", prompt_row);
-        append(&ab, pos_buf, strlen(pos_buf));
-        append(&ab, "\x1b[K", 3);
-        append(&ab, static_prompt, prompt_len);
-        append(&ab, buf, buflen);
-        int cursor_col = prompt_len + buflen + 1;
-        snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;%dH", prompt_row, cursor_col);
-        append(&ab, pos_buf, strlen(pos_buf));
-        if (write(STDOUT_FILENO, ab.b, ab.length) == -1) {
-            free(ab.b);
-            free(buf);
-            die("write");
-        }
-        free(ab.b);
-        int c = input_read_key();
-        if (c == '\r') {
-            if (buflen > 0) return buf;
-            free(buf);
-            return NULL;
-        } else if (c == '\x1b') {
-            free(buf);
-            return NULL;
-        } else if (c == 127 || c == CTRL_KEY('h')) {
-            if (buflen > 0) {
-                buflen--;
-                buf[buflen] = '\0';
-            }
-        } else if (c >= 32 && c < 127) {
-            if (buflen < bufsize - 1) {
-                buf[buflen++] = c;
-                buf[buflen] = '\0';
-            } else {
-                bufsize *= 2;
-                char *new_buf = realloc(buf, bufsize);
-                if (new_buf == NULL) {
-                    free(buf);
-                    die("realloc");
-                }
-                buf = new_buf;
-                buf[buflen++] = c;
-                buf[buflen] = '\0';
-            }
-        }
-    }
-}
-
-void draw_status(buffer *ab) {
+void draw_status(struct Buffer *ab) {
     if (ab == NULL) return;
     append(ab, "\x1b[7m", 4);
     char status[80];
@@ -147,9 +82,9 @@ void draw_status(buffer *ab) {
         snprintf(filename_status, sizeof(filename_status), "%s%s", Editor.filename ? Editor.filename : "[No Name]", Editor.modified ? " *" : "");
     }
     const char *mode_str;
-    if (Editor.mode == MODE_NORMAL) mode_str = "NORMAL";
-    else if (Editor.mode == MODE_INSERT) mode_str = "INSERT";
-    else if (Editor.mode == MODE_COMMAND) mode_str = "COMMAND";
+    if (Editor.mode == 0) mode_str = "NORMAL";
+    else if (Editor.mode == 1) mode_str = "INSERT";
+    else if (Editor.mode == 2) mode_str = "COMMAND";
     else mode_str = "UNKNOWN";
     int len = snprintf(status, sizeof(status), " %s | %s | R:%d L:%d", mode_str, filename_status, Editor.cursor_y + 1, Editor.buffer_rows > 0 ? Editor.buffer_rows : 1);
     if (len > Editor.editor_cols) len = Editor.editor_cols;
@@ -167,7 +102,7 @@ void draw_status(buffer *ab) {
 
 void refresh_screen() {
     scroll_editor();
-    buffer ab = BUFFER_INIT;
+    struct Buffer ab = BUFFER_INIT;
     append(&ab, "\x1b[?25l", 6);
     append(&ab, "\x1b[H", 3);
     draw_content(&ab);
@@ -175,7 +110,7 @@ void refresh_screen() {
     int content_width = Editor.editor_cols - Editor.gutter_width;
     int screen_row = 0;
     for (int filerow = Editor.row_offset; filerow < Editor.cursor_y && filerow < Editor.buffer_rows; filerow++) {
-        Row *row = &Editor.row[filerow];
+        struct Row *row = &Editor.row[filerow];
         int wrapped_lines = (row->size + content_width - 1) / content_width;
         if (wrapped_lines == 0) wrapped_lines = 1;
         screen_row += wrapped_lines;
@@ -189,7 +124,7 @@ void refresh_screen() {
     char buf[32];
     snprintf(buf, sizeof(buf), "\x1b[%d;%dH", cur_y, cur_x);
     append(&ab, buf, strlen(buf));
-    if (Editor.mode == MODE_INSERT) {
+    if (Editor.mode == 1) {
         append(&ab, "\x1b[5 q", 5);
     } else {
         append(&ab, "\x1b[2 q", 5);

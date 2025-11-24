@@ -1,37 +1,26 @@
-#ifndef COMMON_H
-#define COMMON_H
+#ifndef ESTRUCT_H
+#define ESTRUCT_H
 
-#include <stddef.h>
 #include <termios.h>
-#include <libgen.h>
 
-#define CTRL_KEY(k) ((k) & 0x1f)
-#define BUFFER_INIT {NULL, 0}
+#include "edef.h"
 
-typedef struct termios Termios;
-
-enum Mode {
-    MODE_NORMAL = 0,
-    MODE_INSERT = 1,
-    MODE_COMMAND = 2
-};
-
-typedef struct Row {
+struct Row {
     int size;
     char *chars;
     unsigned char *state;
-} Row;
+};
 
-typedef struct buffer {
+struct Buffer {
     char *b;
     int length;
-} buffer;
+};
 
-typedef struct Setup {
+struct Setup {
     int cursor_x, cursor_y;
     int row_offset;
     int buffer_rows;
-    Row *row;
+    struct Row *row;
     int editor_rows;
     int editor_cols;
     int gutter_width;
@@ -39,15 +28,15 @@ typedef struct Setup {
     char *query;
     int found_row;
     int found_col;
-    Termios original;
+    struct termios original;
     char *filename;
     int modified;
     int help_view;
     int file_tree;
-} Setup;
+};
 
 #ifdef GLOBALS
-Setup Editor = {
+struct Setup Editor = {
     .cursor_x = 0,
     .cursor_y = 0,
     .row_offset = 0,
@@ -56,7 +45,7 @@ Setup Editor = {
     .editor_rows = 0,
     .editor_cols = 0,
     .gutter_width = 0,
-    .mode = MODE_NORMAL,
+    .mode = 0,
     .query = NULL,
     .found_row = -1,
     .found_col = -1,
@@ -66,7 +55,7 @@ Setup Editor = {
     .file_tree = 0
 };
 #else
-extern Setup Editor;
+extern struct Setup Editor;
 #endif
 
 #endif

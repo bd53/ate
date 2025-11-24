@@ -3,9 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "common.h"
 #include "utf8.h"
-#include "utils.h"
+#include "util.h"
 
 // https://github.com/torvalds/uemacs/blob/master/utf8.c#L16
 unsigned utf8_to_unicode(const char *line, unsigned index, unsigned len, unicode_t *res) {
@@ -156,7 +155,7 @@ int utf8_next_char_boundary(const char *s, int byte_offset, int max_len) {
 
 void insert_utf8_character(const char *utf8_char, int char_len) {
     if (Editor.cursor_y == Editor.buffer_rows) append_row("", 0);
-    Row *row = &Editor.row[Editor.cursor_y];
+    struct Row *row = &Editor.row[Editor.cursor_y];
     if (Editor.cursor_x < 0) Editor.cursor_x = 0;
     if (Editor.cursor_x > row->size) Editor.cursor_x = row->size;
     if (!utf8_is_char_boundary(row->chars, Editor.cursor_x)) Editor.cursor_x = utf8_prev_char_boundary(row->chars, Editor.cursor_x);
