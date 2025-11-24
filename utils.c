@@ -103,6 +103,18 @@ void abfree(buffer *ab) {
     ab->length = 0;
 }
 
+int leading_whitespace(const char *line, int len) {
+    int count = 0;
+    for (int i = 0; i < len; i++) {
+        if (line[i] == ' ' || line[i] == '\t') {
+            count++;
+        } else {
+            break;
+        }
+    }
+    return count;
+}
+
 char *trim_whitespace(char *str) {
     if (str == NULL) return NULL;
     while (isspace((unsigned char)*str)) str++;
@@ -111,4 +123,26 @@ char *trim_whitespace(char *str) {
     while (end > str && isspace((unsigned char)*end)) end--;
     end[1] = '\0';
     return str;
+}
+
+void trim_leadingspace(int num_spaces) {
+    if (Editor.cursor_y < 0 || Editor.cursor_y >= Editor.buffer_rows) return;
+    Row *row = &Editor.row[Editor.cursor_y];
+    int spaces_to_remove = 0;
+    for (int i = 0; i < row->size && i < num_spaces; i++) {
+        if (row->chars[i] == ' ') {
+            spaces_to_remove++;
+        } else {
+            break;
+        }
+    }
+    if (spaces_to_remove == 0) return;
+    memmove(row->chars, row->chars + spaces_to_remove, row->size - spaces_to_remove + 1);
+    row->size -= spaces_to_remove;
+    memmove(row->state, row->state + spaces_to_remove, row->size);
+    int new_hl_size = row->size > 0 ? row->size : 1;
+    unsigned char *new_hl = realloc(row->state, new_hl_size);
+    if (new_hl) row->state = new_hl;
+    Editor.cursor_x -= spaces_to_remove;
+    if (Editor.cursor_x < 0) Editor.cursor_x = 0;
 }

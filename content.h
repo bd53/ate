@@ -10,6 +10,7 @@ void append_row(char *s, size_t len);
 void delete_row(int at);
 void insert_character(char c);
 void insert_new_line();
+void auto_dedent();
 void delete_character();
 void insert_utf8_character(const char *utf8_char, int char_len);
 void yank_line();

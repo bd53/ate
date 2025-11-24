@@ -39,8 +39,7 @@ static int read_esc_sequence() {
             case '3':
                 if (read(STDIN_FILENO, &seq[2], 1) == 1) {
                     if (seq[2] == ';') {
-                        if (read(STDIN_FILENO, &seq[3], 1) == 1 && seq[3] == '5' &&
-                            read(STDIN_FILENO, &seq[4], 1) == 1 && seq[4] == '~') {
+                        if (read(STDIN_FILENO, &seq[3], 1) == 1 && seq[3] == '5' && read(STDIN_FILENO, &seq[4], 1) == 1 && seq[4] == '~') {
                             return 1008; // CTRL_BACKSPACE
                         }
                     }
@@ -279,6 +278,9 @@ static void handle_insert_mode(int c) {
             if (c >= 32 && c < 127) {
                 Editor.modified = 1;
                 insert_character(c);
+                if (c == '}' || c == ')' || c == ']') {
+                    auto_dedent();
+                }
             } else if (c >= 128) {
                 char utf8_buf[5];
                 utf8_buf[0] = (char)c;

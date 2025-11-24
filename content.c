@@ -115,31 +115,19 @@ void insert_character(char c) {
     Editor.modified = 1;
 }
 
-static int count_leading_whitespace(const char *line, int len) {
-    int count = 0;
-    for (int i = 0; i < len; i++) {
-        if (line[i] == ' ' || line[i] == '\t') {
-            count++;
-        } else {
-            break;
-        }
-    }
-    return count;
-}
-
-static int ends_with_opening_bracket(const char *line, int len) {
+static int opening_bracket(const char *line, int len) {
     int i = len - 1;
     while (i >= 0 && (line[i] == ' ' || line[i] == '\t')) {
         i--;
     }
     if (i >= 0) {
         char last_char = line[i];
-        return (last_char == '{' || last_char == '(' || last_char == '[' || last_char == ':');
+        return (last_char == '{' || last_char == '(' || last_char == '[');
     }
     return 0;
 }
 
-static int starts_with_closing_bracket(const char *line, int len) {
+static int closing_bracket(const char *line, int len) {
     for (int i = 0; i < len; i++) {
         if (line[i] == ' ' || line[i] == '\t') {
             continue;
@@ -152,11 +140,13 @@ static int starts_with_closing_bracket(const char *line, int len) {
 void insert_new_line() {
     int indent_spaces = 0;
     int add_extra_indent = 0;
+    char *second_half = NULL;
+    int second_half_len = 0;
     Row *current_row = NULL;
     if (Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) {
         current_row = &Editor.row[Editor.cursor_y];
-        indent_spaces = count_leading_whitespace(current_row->chars, current_row->size);
-        add_extra_indent = ends_with_opening_bracket(current_row->chars, current_row->size);
+        indent_spaces = leading_whitespace(current_row->chars, current_row->size);
+        add_extra_indent = opening_bracket(current_row->chars, current_row->size);
     }
     if (Editor.cursor_y == Editor.buffer_rows) {
         append_row("", 0);
@@ -168,8 +158,8 @@ void insert_new_line() {
         if (!utf8_is_char_boundary(row->chars, split_at)) {
             split_at = utf8_prev_char_boundary(row->chars, split_at);
         }
-        int second_half_len = row->size - split_at;
-        char *second_half = malloc(second_half_len + 1);
+        second_half_len = row->size - split_at;
+        second_half = malloc(second_half_len + 1);
         if (!second_half) die("malloc");
         memcpy(second_half, &row->chars[split_at], second_half_len);
         second_half[second_half_len] = '\0';
@@ -189,14 +179,15 @@ void insert_new_line() {
         }
         row->state = new_hl;
         insert_row(Editor.cursor_y + 1, second_half, second_half_len);
-        free(second_half);
     }
     Editor.cursor_y++;
     Editor.cursor_x = 0;
     Editor.modified = 1;
     if (indent_spaces > 0 || add_extra_indent) {
-        Row *new_row = &Editor.row[Editor.cursor_y];
-        int dedent = starts_with_closing_bracket(new_row->chars, new_row->size);
+        int dedent = 0;
+        if (second_half && second_half_len > 0) {
+            dedent = closing_bracket(second_half, second_half_len);
+        }
         int final_indent = indent_spaces;
         if (add_extra_indent && !dedent) {
             final_indent += 4;
@@ -205,6 +196,27 @@ void insert_new_line() {
         }
         for (int i = 0; i < final_indent; i++) {
             insert_character(' ');
+        }
+    }
+    if (second_half) {
+        free(second_half);
+    }
+}
+
+void auto_dedent() {
+    if (Editor.cursor_y < 0 || Editor.cursor_y >= Editor.buffer_rows) return;
+    Row *row = &Editor.row[Editor.cursor_y];
+    int only_whitespace = 1;
+    for (int i = 0; i < Editor.cursor_x - 1; i++) {
+        if (row->chars[i] != ' ' && row->chars[i] != '\t') {
+            only_whitespace = 0;
+            break;
+        }
+    }
+    if (only_whitespace) {
+        int leading_spaces = leading_whitespace(row->chars, row->size);
+        if (leading_spaces >= 4) {
+            trim_leadingspace(4);
         }
     }
 }
