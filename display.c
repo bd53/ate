@@ -69,7 +69,13 @@ void display_status(struct Buffer *ab) {
     if (ab == NULL) return;
     append(ab, "\x1b[7m", 4);
     char status[80];
-    const char *filetype_name = "txt";
+    const char *filetype_name = "[No Name]";
+    if (Editor.filename) {
+        char *dot = strrchr(Editor.filename, '.');
+        if (dot && *(dot + 1) != '\0') {
+            filetype_name = dot + 1;
+        }
+    }
     char filename_status[64];
     if (Editor.file_tree) {
         snprintf(filename_status, sizeof(filename_status), "netft");
@@ -81,7 +87,8 @@ void display_status(struct Buffer *ab) {
     else if (Editor.mode == 1) mode_str = "INSERT";
     else if (Editor.mode == 2) mode_str = "COMMAND";
     else mode_str = "UNKNOWN";
-    int len = snprintf(status, sizeof(status), " %s | %s | R:%d L:%d", mode_str, filename_status, Editor.cursor_y + 1, Editor.buffer_rows > 0 ? Editor.buffer_rows : 1);
+    int percentage = (Editor.buffer_rows > 0) ? (int)(((float)(Editor.cursor_y + 1) / Editor.buffer_rows) * 100) : 100;
+    int len = snprintf(status, sizeof(status), " %s | %s | R:%d L:%d (%d%%)", mode_str, filename_status, Editor.cursor_y + 1, Editor.buffer_rows > 0 ? Editor.buffer_rows : 1, percentage);
     if (len > Editor.editor_cols) len = Editor.editor_cols;
     append(ab, status, len);
     char rstatus[80];
