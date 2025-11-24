@@ -10,7 +10,6 @@
 #include "content.h"
 #include "display.h"
 #include "file.h"
-#include "init.h"
 #include "keybinds.h"
 #include "search.h"
 #include "tree.h"
@@ -61,62 +60,63 @@ int input_read_key() {
 }
 
 void cursor_move(int key) {
-    erow *row = (E.cy >= 0 && E.cy < E.numrows) ? &E.row[E.cy] : NULL;
-    E.match_row = -1;
-    E.match_col = -1;
+    Row *row = (Editor.curor_y >= 0 && Editor.curor_y < Editor.buffer_rows) ? &Editor.row[Editor.curor_y] : NULL;
+    Editor.found_row = -1;
+    Editor.found_col = -1;
     switch (key) {
         case 1004:
-            if (E.cx > 0) {
+            if (Editor.cursor_x > 0) {
                 if (row) {
-                    E.cx = utf8_prev_char_boundary(row->chars, E.cx);
+                    Editor.cursor_x = utf8_prev_char_boundary(row->chars, Editor.cursor_x);
                 } else {
-                    E.cx--;
+                    Editor.cursor_x--;
                 }
-            } else if (E.cy > 0) {
-                E.cy--;
-                if (E.cy >= 0 && E.cy < E.numrows) {
-                    E.cx = E.row[E.cy].size;
+            } else if (Editor.curor_y > 0) {
+                Editor.curor_y--;
+                if (Editor.curor_y >= 0 && Editor.curor_y < Editor.buffer_rows) {
+                    Editor.cursor_x = Editor.row[Editor.curor_y].size;
                 }
             }
             break;
         case 1005:
-            if (row && E.cx < row->size) {
-                E.cx = utf8_next_char_boundary(row->chars, E.cx, row->size);
-            } else if (row && E.cx == row->size && E.cy < E.numrows - 1) {
-                E.cy++;
-                E.cx = 0;
+            if (row && Editor.cursor_x < row->size) {
+                Editor.cursor_x = utf8_next_char_boundary(row->chars, Editor.cursor_x, row->size);
+            } else if (row && Editor.cursor_x == row->size && Editor.curor_y < Editor.buffer_rows - 1) {
+                Editor.curor_y++;
+                Editor.cursor_x = 0;
             }
             break;
         case 1002:
-            if (E.cy > 0) E.cy--;
+            if (Editor.curor_y > 0) Editor.curor_y--;
             break;
         case 1003:
-            if (E.cy < E.numrows - 1) E.cy++;
+            if (Editor.curor_y < Editor.buffer_rows - 1) Editor.curor_y++;
             break;
         case 1000:
-            E.cx = 0;
+            Editor.cursor_x = 0;
             break;
         case 1001:
-            if (row) E.cx = row->size;
+            if (row) Editor.cursor_x = row->size;
             break;
         case 1006:
         case 1007: {
-            int jump = (E.screenrows / 7 < 1) ? 1 : E.screenrows / 7;
-            E.cy += (key == 1006) ? -jump : jump;
-            if (E.cy < 0) E.cy = 0;
-            if (E.cy >= E.numrows) E.cy = E.numrows - 1;
+            int jump = (Editor.editor_rows / 7 < 1) ? 1 : Editor.editor_rows / 7;
+            Editor.curor_y += (key == 1006) ? -jump : jump;
+            if (Editor.curor_y < 0) Editor.curor_y = 0;
+            if (Editor.curor_y >= Editor.buffer_rows) Editor.curor_y = Editor.buffer_rows - 1;
             break;
         }
     }
-    row = (E.numrows > 0 && E.cy >= 0 && E.cy < E.numrows) ? &E.row[E.cy] : NULL;
+    row = (Editor.buffer_rows > 0 && Editor.curor_y >= 0 && Editor.curor_y < Editor.buffer_rows) ? &Editor.row[Editor.curor_y] : NULL;
     int len = row ? row->size : 0;
-    if (E.cx > len) E.cx = len;
-    if (row && E.cx > 0 && E.cx < row->size) {
-        if (!utf8_is_char_boundary(row->chars, E.cx)) {
-            E.cx = utf8_prev_char_boundary(row->chars, E.cx);
+    if (Editor.cursor_x > len) Editor.cursor_x = len;
+    if (row && Editor.cursor_x > 0 && Editor.cursor_x < row->size) {
+        if (!utf8_is_char_boundary(row->chars, Editor.cursor_x)) {
+            Editor.cursor_x = utf8_prev_char_boundary(row->chars, Editor.cursor_x);
         }
     }
 }
+
 
 static int translate_key(int key) {
     switch (key) {
@@ -149,7 +149,7 @@ static void handle_file_tree(int c) {
             toggle_file_tree();
             return;
         case ':':
-            E.mode = MODE_COMMAND;
+            Editor.mode = MODE_COMMAND;
             command_mode();
             return;
         case '\r':
@@ -183,13 +183,13 @@ static void handle_help(int c) {
         case 'q':
         case '\x1b':
             run_cleanup();
-            E.is_help_view = 0;
-            if (E.numrows == 0) {
+            Editor.help_view = 0;
+            if (Editor.buffer_rows == 0) {
                 append_row("", 0);
             }
             break;
         case ':':
-            E.mode = MODE_COMMAND;
+            Editor.mode = MODE_COMMAND;
             command_mode();
             return;
         case CTRL_KEY('h'):
@@ -223,7 +223,7 @@ static void handle_normal_mode(int c) {
         case '\r':
             break;
         case ':':
-            E.mode = MODE_COMMAND;
+            Editor.mode = MODE_COMMAND;
             command_mode();
             return;
         case CTRL_KEY('h'):
@@ -239,7 +239,7 @@ static void handle_normal_mode(int c) {
             toggle_workspace_find();
             return;
         case CTRL_KEY('s'):
-            save_editor();
+            save_file();
             return;
         case 'n':
             workspace_find_next(1);
@@ -248,7 +248,7 @@ static void handle_normal_mode(int c) {
             workspace_find_next(-1);
             return;
         case 'i':
-            E.mode = MODE_INSERT;
+            Editor.mode = MODE_INSERT;
             break;
         case 'y':
             yank_line();
@@ -268,11 +268,11 @@ static void handle_normal_mode(int c) {
 static void handle_insert_mode(int c) {
     switch (c) {
         case '\r':
-            E.dirty = 1;
+            Editor.modified = 1;
             insert_new_line();
             break;
         case '\t':
-            E.dirty = 1;
+            Editor.modified = 1;
             for (int i = 0; i < 4; i++) {
                 insert_character(' ');
             }
@@ -286,7 +286,7 @@ static void handle_insert_mode(int c) {
             break;
         default:
             if (c >= 32 && c < 127) {
-                E.dirty = 1;
+                Editor.modified = 1;
                 insert_character(c);
             } else if (c >= 128) {
                 char utf8_buf[5];
@@ -305,7 +305,7 @@ static void handle_insert_mode(int c) {
                 }
                 utf8_buf[char_len] = '\0';
 
-                E.dirty = 1;
+                Editor.modified = 1;
                 insert_utf8_character(utf8_buf, char_len);
             }
             break;
@@ -314,11 +314,11 @@ static void handle_insert_mode(int c) {
 
 void process_keypress() {
     int c = input_read_key();
-    if (E.is_file_tree) {
+    if (Editor.file_tree) {
         handle_file_tree(c);
         return;
     }
-    if (E.is_help_view) {
+    if (Editor.help_view) {
         handle_help(c);
         return;
     }
@@ -330,26 +330,26 @@ void process_keypress() {
             toggle_file_tree();
             break;
         case 8:
-            if (E.mode == MODE_INSERT) {
+            if (Editor.mode == MODE_INSERT) {
                 delete_line();
-            } else if (E.mode == MODE_NORMAL) {
+            } else if (Editor.mode == MODE_NORMAL) {
                 open_help();
             }
             break;
         case 1008:
-            if (E.mode == MODE_INSERT) {
+            if (Editor.mode == MODE_INSERT) {
                 delete_line();
             }
             break;
         case '\x1b':
-            if (E.mode == MODE_INSERT) {
-                E.mode = MODE_NORMAL;
-                if (E.cx > 0 && E.cy >= 0 && E.cy < E.numrows) {
-                    erow *row = &E.row[E.cy];
-                    E.cx = utf8_prev_char_boundary(row->chars, E.cx);
+            if (Editor.mode == MODE_INSERT) {
+                Editor.mode = MODE_NORMAL;
+                if (Editor.cursor_x > 0 && Editor.curor_y >= 0 && Editor.curor_y < Editor.buffer_rows) {
+                    Row *row = &Editor.row[Editor.curor_y];
+                    Editor.cursor_x = utf8_prev_char_boundary(row->chars, Editor.cursor_x);
                 }
-            } else if (E.mode == MODE_COMMAND) {
-                E.mode = MODE_NORMAL;
+            } else if (Editor.mode == MODE_COMMAND) {
+                Editor.mode = MODE_NORMAL;
             }
             break;
         case 1002:
@@ -363,9 +363,9 @@ void process_keypress() {
             cursor_move(c);
             break;
         default:
-            if (E.mode == MODE_NORMAL) {
+            if (Editor.mode == MODE_NORMAL) {
                 handle_normal_mode(c);
-            } else if (E.mode == MODE_INSERT) {
+            } else if (Editor.mode == MODE_INSERT) {
                 handle_insert_mode(c);
             }
             break;

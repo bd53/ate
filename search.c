@@ -143,8 +143,8 @@ void toggle_workspace_find() {
         refresh_screen();
         return;
     }
-    if (E.query) free(E.query);
-    E.query = strdup(query);
+    if (Editor.query) free(Editor.query);
+    Editor.query = strdup(query);
     char cwd[1024];
     if (!getcwd(cwd, sizeof(cwd))) {
         free(query);
@@ -161,17 +161,17 @@ void toggle_workspace_find() {
         char *result_filepath = filepaths[index];
         int result_row = rows[index];
         int result_col = cols[index];
-        if (E.dirty && E.filename) {
-            save_editor();
+        if (Editor.modified && Editor.filename) {
+            save_file();
         }
-        if (E.filename == NULL || strcmp(E.filename, result_filepath) != 0) {
+        if (Editor.filename == NULL || strcmp(Editor.filename, result_filepath) != 0) {
             open_editor(result_filepath);
         }
-        if (result_row >= 0 && result_row < E.numrows) {
-            E.cy = result_row;
-            E.cx = result_col;
-            E.match_row = result_row;
-            E.match_col = result_col;
+        if (result_row >= 0 && result_row < Editor.buffer_rows) {
+            Editor.curor_y = result_row;
+            Editor.cursor_x = result_col;
+            Editor.found_row = result_row;
+            Editor.found_col = result_col;
             scroll_editor();
         }
         char msg[512];
@@ -206,17 +206,17 @@ void workspace_find_next(int direction) {
     char *result_filepath = filepaths[index];
     int result_row = rows[index];
     int result_col = cols[index];
-    if (E.dirty && E.filename) {
-        save_editor();
+    if (Editor.modified && Editor.filename) {
+        save_file();
     }
-    if (E.filename == NULL || strcmp(E.filename, result_filepath) != 0) {
+    if (Editor.filename == NULL || strcmp(Editor.filename, result_filepath) != 0) {
         open_editor(result_filepath);
     }
-    if (result_row >= 0 && result_row < E.numrows) {
-        E.cy = result_row;
-        E.cx = result_col;
-        E.match_row = result_row;
-        E.match_col = result_col;
+    if (result_row >= 0 && result_row < Editor.buffer_rows) {
+        Editor.curor_y = result_row;
+        Editor.cursor_x = result_col;
+        Editor.found_row = result_row;
+        Editor.found_col = result_col;
         scroll_editor();
     }
     char msg[512];

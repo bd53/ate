@@ -3,8 +3,7 @@
 
 #include <stddef.h>
 
-int open_editor(char *filename);
-void save_editor();
+void save_file();
 void open_file();
 
 #endif

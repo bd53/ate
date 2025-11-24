@@ -8,10 +8,7 @@
 #define CTRL_KEY(k) ((k) & 0x1f)
 #define BUFFER_INIT {NULL, 0}
 
-enum Highlight {
-    HL_NORMAL = 0,
-    HL_MATCH,
-};
+typedef struct termios Termios;
 
 enum Mode {
     MODE_NORMAL = 0,
@@ -19,39 +16,57 @@ enum Mode {
     MODE_COMMAND = 2
 };
 
-typedef struct {
+typedef struct Row {
     int size;
     char *chars;
-    unsigned char *hl;
-    int hl_open_comment;
-} erow;
+    unsigned char *state;
+} Row;
 
-struct buffer {
+typedef struct buffer {
     char *b;
-    int len;
-};
+    int length;
+} buffer;
 
-struct Setup {
-    int cx, cy;
-    int rowoff;
-    int numrows;
-    erow *row;
-    int screenrows;
-    int screencols;
+typedef struct Setup {
+    int cursor_x, curor_y;
+    int row_offset;
+    int buffer_rows;
+    Row *row;
+    int editor_rows;
+    int editor_cols;
     int gutter_width;
     int mode;
     char *query;
-    int match_row;
-    int match_col;
-    struct termios orig_termios;
-    int search_start_row;
-    int search_start_col;
+    int found_row;
+    int found_col;
+    Termios original;
     char *filename;
-    int dirty;
-    int is_help_view;
-    int is_file_tree;
-};
+    int modified;
+    int help_view;
+    int file_tree;
+} Setup;
 
-extern struct Setup E;
+#ifdef GLOBALS
+Setup Editor = {
+    .cursor_x = 0,
+    .curor_y = 0,
+    .row_offset = 0,
+    .buffer_rows = 0,
+    .row = NULL,
+    .editor_rows = 0,
+    .editor_cols = 0,
+    .gutter_width = 0,
+    .mode = MODE_NORMAL,
+    .query = NULL,
+    .found_row = -1,
+    .found_col = -1,
+    .filename = NULL,
+    .modified = 0,
+    .help_view = 0,
+    .file_tree = 0
+};
+#else
+extern Setup Editor;
+#endif
 
 #endif

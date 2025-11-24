@@ -13,44 +13,21 @@
 #include "tree.h"
 #include "utils.h"
 
-void open_help() {
-    if (E.is_help_view) {
-        run_cleanup();
-        E.is_help_view = 0;
-        E.is_file_tree = 0;
-        if (E.numrows == 0) {
-            append_row("", 0);
-        }
-    } else {
-        run_cleanup();
-        open_editor("help.txt");
-        if (E.numrows == 0) {
-            append_row("", 0);
-        }
-        E.cx = 0;
-        E.cy = 0;
-        E.rowoff = 0;
-        E.is_help_view = 1;
-        E.is_file_tree = 0;
-    }
-    refresh_screen();
-}
-
 void execute_command(char *cmd) {
     if (cmd == NULL || strlen(cmd) == 0) return;
     cmd = trim_whitespace(cmd);
     if (cmd == NULL || strlen(cmd) == 0) return;
     if (strcmp(cmd, "q") == 0) {
         run_cleanup();
-        E.is_file_tree = 0;
-        E.is_help_view = 0;
-        if (E.numrows == 0) {
+        Editor.file_tree = 0;
+        Editor.help_view = 0;
+        if (Editor.buffer_rows == 0) {
             append_row("", 0);
         }
-        E.cx = 0;
-        E.cy = 0;
-        E.rowoff = 0;
-        E.dirty = 0;
+        Editor.cursor_x = 0;
+        Editor.curor_y = 0;
+        Editor.row_offset = 0;
+        Editor.modified = 0;
         refresh_screen();
         return;
     }
@@ -64,7 +41,7 @@ void execute_command(char *cmd) {
         toggle_file_tree();
     }
     else if (strcmp(cmd, "bd") == 0) {
-        if (E.is_file_tree) {
+        if (Editor.file_tree) {
             toggle_file_tree();
         }
     }
@@ -81,22 +58,22 @@ void execute_command(char *cmd) {
             if (arg && *arg) {
                 char *new_filename = strdup(arg);
                 if (!new_filename) die("strdup");
-                if (E.filename) {
-                    free(E.filename);
-                    E.filename = NULL;
+                if (Editor.filename) {
+                    free(Editor.filename);
+                    Editor.filename = NULL;
                 }
-                E.filename = new_filename;
+                Editor.filename = new_filename;
             }
         }
-        if (E.filename == NULL) {
+        if (Editor.filename == NULL) {
             char *filename = prompt("Save as: %s (ESC to cancel)");
             if (!filename) {
                 refresh_screen();
                 return;
             }
-            E.filename = filename;
+            Editor.filename = filename;
         }
-        save_editor();
+        save_file();
     }
     else if (strcmp(cmd, "help") == 0) {
         open_help();
@@ -119,10 +96,10 @@ void command_mode() {
     if (!buf) die("malloc");
     size_t buflen = 0;
     buf[0] = '\0';
-    int prompt_row = E.screenrows + 2;
+    int prompt_row = Editor.editor_rows + 2;
     while(1) {
         scroll_editor();
-        struct buffer ab = BUFFER_INIT;
+        buffer ab = BUFFER_INIT;
         abinit(&ab);
         abappend(&ab, "\x1b[?25l", 6);
         abappend(&ab, "\x1b[H", 3);
@@ -138,7 +115,7 @@ void command_mode() {
         snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;%dH", prompt_row, cursor_col);
         abappend(&ab, pos_buf, strlen(pos_buf));
         abappend(&ab, "\x1b[?25h", 6);
-        if (write(STDOUT_FILENO, ab.b, ab.len) == -1) {
+        if (write(STDOUT_FILENO, ab.b, ab.length) == -1) {
             abfree(&ab);
             free(buf);
             die("write");
@@ -146,7 +123,7 @@ void command_mode() {
         abfree(&ab);
         int c = input_read_key();
         if (c == '\r') {
-            E.mode = MODE_NORMAL;
+            Editor.mode = MODE_NORMAL;
             if (buflen > 0) {
                 execute_command(buf);
             }
@@ -154,7 +131,7 @@ void command_mode() {
             refresh_screen();
             return;
         } else if (c == '\x1b') {
-            E.mode = MODE_NORMAL;
+            Editor.mode = MODE_NORMAL;
             free(buf);
             refresh_screen();
             return;

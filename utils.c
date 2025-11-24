@@ -4,14 +4,21 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
-#include <termios.h>
 #include <unistd.h>
 
 #include "common.h"
 #include "keybinds.h"
 #include "utils.h"
 
-struct Setup E;
+void run_cleanup() {
+    if (Editor.query) {
+        free(Editor.query);
+        Editor.query = NULL;
+    }
+    free_rows();
+    free_file_entries();
+    free_workspace_search();
+}
 
 void die(const char *s) {
     write(STDOUT_FILENO, "\x1b[2J", 4);
@@ -21,7 +28,7 @@ void die(const char *s) {
 }
 
 void disable_raw_mode() {
-    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.orig_termios) == -1) {
+    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &Editor.original) == -1) {
         die("tcsetattr");
     }
     write(STDOUT_FILENO, "\x1b[?1049l", 8);
@@ -31,11 +38,11 @@ void disable_raw_mode() {
 }
 
 void enable_raw_mode() {
-    if (tcgetattr(STDIN_FILENO, &E.orig_termios) == -1) {
+    if (tcgetattr(STDIN_FILENO, &Editor.original) == -1) {
         die("tcgetattr");
     }
     atexit(disable_raw_mode);
-    struct termios raw = E.orig_termios;
+    Termios raw = Editor.original;
     raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
     raw.c_oflag &= ~(OPOST);
     raw.c_cflag |= (CS8);
@@ -95,37 +102,37 @@ int get_window_size(int *rows, int *cols) {
     }
 }
 
-void abinit(struct buffer *ab) {
+void abinit(buffer *ab) {
     if (ab == NULL) {
         return;
     }
     ab->b = NULL;
-    ab->len = 0;
+    ab->length = 0;
 }
 
-void abappend(struct buffer *ab, const char *s, int len) {
+void abappend(buffer *ab, const char *s, int len) {
     if (ab == NULL || s == NULL || len < 0) {
         return;
     }
     if (len == 0) {
         return;
     }
-    char *new = realloc(ab->b, ab->len + len);
+    char *new = realloc(ab->b, ab->length + len);
     if (new == NULL) {
         die("realloc");
     }
-    memcpy(&new[ab->len], s, len);
+    memcpy(&new[ab->length], s, len);
     ab->b = new;
-    ab->len += len;
+    ab->length += len;
 }
 
-void abfree(struct buffer *ab) {
+void abfree(buffer *ab) {
     if (ab == NULL) {
         return;
     }
     free(ab->b);
     ab->b = NULL;
-    ab->len = 0;
+    ab->length = 0;
 }
 
 char *trim_whitespace(char *str) {

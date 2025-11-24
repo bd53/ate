@@ -223,9 +223,9 @@ void check_health() {
     check_os_info();
     check_external_tools();
     check_clipboard();
-    E.is_help_view = 1;
-    E.cx = 0;
-    E.cy = 0;
-    E.rowoff = 0;
+    Editor.help_view = 1;
+    Editor.cursor_x = 0;
+    Editor.curor_y = 0;
+    Editor.row_offset = 0;
     refresh_screen();
 }
