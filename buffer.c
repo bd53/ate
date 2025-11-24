@@ -326,18 +326,9 @@ void draw_content(struct Buffer *ab) {
             if (!Editor.file_tree) {
                 append(ab, "\x1b[38;5;244m", 11);
                 if (wrap_line == 0) {
-                    if (Editor.mode == 0) {
-                        if (filerow == Editor.cursor_y) {
-                            append(ab, "\x1b[33m", 5);
-                            line_num_len = snprintf(line_num_buf, sizeof(line_num_buf), "%*s ", Editor.gutter_width - 1, ">>");
-                        } else {
-                            int rel_num = abs(filerow - Editor.cursor_y);
-                            line_num_len = snprintf(line_num_buf, sizeof(line_num_buf), "%*d ", Editor.gutter_width - 1, rel_num);
-                        }
-                    } else {
-                        int abs_num = filerow + 1;
-                        line_num_len = snprintf(line_num_buf, sizeof(line_num_buf), "%*d ", Editor.gutter_width - 1, abs_num);
-                    }
+                    int abs_num = filerow + 1;
+                    if (filerow == Editor.cursor_y) append(ab, "\x1b[32m", 5);
+                    line_num_len = snprintf(line_num_buf, sizeof(line_num_buf), "%*d ", Editor.gutter_width - 1, abs_num);
                 } else {
                     line_num_len = snprintf(line_num_buf, sizeof(line_num_buf), "%*s ", Editor.gutter_width - 1, "");
                 }
