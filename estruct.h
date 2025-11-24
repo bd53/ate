@@ -19,6 +19,7 @@ struct Buffer {
 struct Setup {
     int cursor_x, cursor_y;
     int row_offset;
+    int col_offset;
     int buffer_rows;
     struct Row *row;
     int editor_rows;
@@ -40,6 +41,7 @@ struct Setup Editor = {
     .cursor_x = 0,
     .cursor_y = 0,
     .row_offset = 0,
+    .col_offset = 0,
     .buffer_rows = 0,
     .row = NULL,
     .editor_rows = 0,

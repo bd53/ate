@@ -365,9 +365,11 @@ void draw_content(struct Buffer *ab) {
                 char c = row->chars[i];
                 if (!Editor.file_tree) {
                     int hl = row->state[i];
-                    int match_col = Editor.found_col;
-                    int query_len = (Editor.query != NULL) ? strlen(Editor.query) : 0;
-                    if (Editor.query && filerow == Editor.found_row && i >= match_col && i < match_col + query_len) hl = 1;
+                    if (Editor.query && filerow == Editor.found_row) {
+                        int match_col = Editor.found_col;
+                        int query_len = strlen(Editor.query);
+                        if (i >= match_col && i < match_col + query_len) hl = 1;
+                    }
                     if (hl != current_hl) {
                         current_hl = hl;
                         char *color_code = (hl == 1) ? "\x1b[45m" : "\x1b[0m";
@@ -458,6 +460,9 @@ void execute_command(char *cmd) {
     }
     else if (strcmp(cmd, "checkhealth") == 0) {
         check_health();
+    }
+    else if (strcmp(cmd, "find") == 0) {
+        toggle_workspace_find();
     }
     else {
         char error_msg[256];

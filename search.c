@@ -91,11 +91,18 @@ static void collect_and_search_files(const char *dirpath, const char *query, int
             ssize_t linelen;
             int row_num = 0;
             while ((linelen = getline(&line, &linecap, fp)) != -1) {
-                char *trimmed = trim_whitespace(line);
-                char *pos = trimmed;
+                if (linelen > 0 && line[linelen - 1] == '\n') {
+                    line[linelen - 1] = '\0';
+                    linelen--;
+                }
+                if (linelen > 0 && line[linelen - 1] == '\r') {
+                    line[linelen - 1] = '\0';
+                    linelen--;
+                }
+                char *pos = line;
                 while ((pos = strstr(pos, query)) != NULL) {
-                    int col = (int)(pos - trimmed);
-                    add_search_result(full_path, row_num, col, trimmed);
+                    int col = (int)(pos - line);
+                    add_search_result(full_path, row_num, col, line);
                     pos++;
                 }
                 row_num++;
@@ -127,6 +134,50 @@ void free_workspace_search() {
     capacity = 0;
 }
 
+static void jump_to_result(int index) {
+    if (index < 0 || index >= num_results) return;
+    char *result_filepath = filepaths[index];
+    int result_row = rows[index];
+    int result_col = cols[index];
+    if (Editor.modified && Editor.filename) save_file();
+    if (Editor.filename == NULL || strcmp(Editor.filename, result_filepath) != 0) display_editor(result_filepath);
+    if (result_row >= 0 && result_row < Editor.buffer_rows) {
+        Editor.cursor_y = result_row;
+        Editor.cursor_x = result_col;
+        Editor.found_row = result_row;
+        Editor.found_col = result_col;
+        int content_width = Editor.editor_cols - Editor.gutter_width;
+        if (content_width <= 0) content_width = 80; // fallback
+        if (Editor.cursor_y < Editor.row_offset) Editor.row_offset = Editor.cursor_y;
+        if (Editor.cursor_y >= Editor.row_offset + Editor.editor_rows) Editor.row_offset = Editor.cursor_y - Editor.editor_rows + 1;
+        int wrap_line = Editor.cursor_x / content_width;
+        int screen_rows_before = 0;
+        for (int i = Editor.row_offset; i < Editor.cursor_y && i < Editor.buffer_rows; i++) {
+            struct Row *row = &Editor.row[i];
+            int wrapped_lines = (row->size + content_width - 1) / content_width;
+            if (wrapped_lines == 0) wrapped_lines = 1;
+            screen_rows_before += wrapped_lines;
+        }
+        int total_screen_row = screen_rows_before + wrap_line;
+        if (total_screen_row >= Editor.editor_rows) {
+            int target_offset = Editor.cursor_y - Editor.editor_rows / 2;
+            if (target_offset < 0) target_offset = 0;
+            Editor.row_offset = target_offset;
+        }
+    }
+    char msg[512];
+    const char *display_path = result_filepath;
+    char cwd[1024];
+    if (getcwd(cwd, sizeof(cwd))) {
+        size_t cwd_len = strlen(cwd);
+        if (strncmp(result_filepath, cwd, cwd_len) == 0 && result_filepath[cwd_len] == '/') {
+            display_path = result_filepath + cwd_len + 1;
+        }
+    }
+    snprintf(msg, sizeof(msg), "Match %d/%d: %s:%d:%d", index + 1, num_results, display_path, result_row + 1, result_col + 1);
+    display_message(1, msg);
+}
+
 void toggle_workspace_find() {
     free_workspace_search();
     char *query = prompt("Find in workspace: %s (ESC to cancel)");
@@ -153,35 +204,7 @@ void toggle_workspace_find() {
     free(query);
     if (num_results > 0) {
         current_index = 0;
-        int index = 0;
-        char *result_filepath = filepaths[index];
-        int result_row = rows[index];
-        int result_col = cols[index];
-        if (Editor.modified && Editor.filename) {
-            save_file();
-        }
-        if (Editor.filename == NULL || strcmp(Editor.filename, result_filepath) != 0) {
-            display_editor(result_filepath);
-        }
-        if (result_row >= 0 && result_row < Editor.buffer_rows) {
-            Editor.cursor_y = result_row;
-            Editor.cursor_x = result_col;
-            Editor.found_row = result_row;
-            Editor.found_col = result_col;
-            if (Editor.cursor_y < Editor.row_offset) Editor.row_offset = Editor.cursor_y;
-            if (Editor.cursor_y >= Editor.row_offset + Editor.editor_rows) Editor.row_offset = Editor.cursor_y - Editor.editor_rows + 1;
-        }
-        char msg[512];
-        const char *display_path = result_filepath;
-        char cwd_buf[1024];
-        if (getcwd(cwd_buf, sizeof(cwd_buf))) {
-            size_t cwd_len = strlen(cwd_buf);
-            if (strncmp(result_filepath, cwd_buf, cwd_len) == 0 && result_filepath[cwd_len] == '/') {
-                display_path = result_filepath + cwd_len + 1;
-            }
-        }
-        snprintf(msg, sizeof(msg), "Match %d/%d: %s:%d", index + 1, num_results, display_path, result_row + 1);
-        display_message(1, msg);
+        jump_to_result(0);
     } else {
         display_message(2, "No matches found in workspace");
     }
@@ -199,30 +222,6 @@ void workspace_find_next(int direction) {
     } else if (current_index < 0) {
         current_index = num_results - 1;
     }
-    int index = current_index;
-    char *result_filepath = filepaths[index];
-    int result_row = rows[index];
-    int result_col = cols[index];
-    if (Editor.modified && Editor.filename) save_file();
-    if (Editor.filename == NULL || strcmp(Editor.filename, result_filepath) != 0) display_editor(result_filepath);
-    if (result_row >= 0 && result_row < Editor.buffer_rows) {
-        Editor.cursor_y = result_row;
-        Editor.cursor_x = result_col;
-        Editor.found_row = result_row;
-        Editor.found_col = result_col;
-        if (Editor.cursor_y < Editor.row_offset) Editor.row_offset = Editor.cursor_y;
-        if (Editor.cursor_y >= Editor.row_offset + Editor.editor_rows) Editor.row_offset = Editor.cursor_y - Editor.editor_rows + 1;
-    }
-    char msg[512];
-    const char *display_path = result_filepath;
-    char cwd[1024];
-    if (getcwd(cwd, sizeof(cwd))) {
-        size_t cwd_len = strlen(cwd);
-        if (strncmp(result_filepath, cwd, cwd_len) == 0 && result_filepath[cwd_len] == '/') {
-            display_path = result_filepath + cwd_len + 1;
-        }
-    }
-    snprintf(msg, sizeof(msg), "Match %d/%d: %s:%d", index + 1, num_results, display_path, result_row + 1);
-    display_message(1, msg);
+    jump_to_result(current_index);
     refresh_screen();
 }
