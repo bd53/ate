@@ -4,10 +4,6 @@
 #include <stddef.h>
 #include "common.h"
 
-int utf8_char_len(const char *s, int max_len);
-int utf8_is_char_boundary(const char *s, int byte_offset);
-int utf8_prev_char_boundary(const char *s, int byte_offset);
-int utf8_next_char_boundary(const char *s, int byte_offset, int max_len);
 void free_rows();
 void insert_row(int at, char *s, size_t len);
 void append_row(char *s, size_t len);

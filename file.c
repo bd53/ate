@@ -17,9 +17,7 @@ void save_file() {
             refresh_screen();
             return;
         }
-        if (Editor.filename) {
-            free(Editor.filename);
-        }
+        if (Editor.filename) free(Editor.filename);
         Editor.filename = filename;
     }
     FILE *fp = fopen(Editor.filename, "w");
@@ -45,16 +43,12 @@ void open_file() {
         refresh_screen();
         return;
     }
-    if (Editor.file_tree) {
-        free_file_entries();
-    }
+    if (Editor.file_tree) free_file_entries();
     Editor.file_tree = 0;
     Editor.help_view = 0;
     open_editor(filename);
     free(filename);
-    if (Editor.buffer_rows == 0) {
-        append_row("", 0);
-    }
+    if (Editor.buffer_rows == 0) append_row("", 0);
     Editor.cursor_x = 0;
     Editor.cursor_y = 0;
     Editor.row_offset = 0;

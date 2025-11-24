@@ -40,8 +40,7 @@ int open_editor(char *filename) {
     size_t linecap = 0;
     ssize_t linelen;
     while ((linelen = getline(&line, &linecap, fp)) != -1) {
-        while (linelen > 0 && (line[linelen - 1] == '\n' || line[linelen - 1] == '\r'))
-            linelen--;
+        while (linelen > 0 && (line[linelen - 1] == '\n' || line[linelen - 1] == '\r')) linelen--;
         append_row(line, linelen);
     }
     free(line);
@@ -54,15 +53,11 @@ void open_help() {
         run_cleanup();
         Editor.help_view = 0;
         Editor.file_tree = 0;
-        if (Editor.buffer_rows == 0) {
-            append_row("", 0);
-        }
+        if (Editor.buffer_rows == 0) append_row("", 0);
     } else {
         run_cleanup();
         open_editor("help.txt");
-        if (Editor.buffer_rows == 0) {
-            append_row("", 0);
-        }
+        if (Editor.buffer_rows == 0) append_row("", 0);
         Editor.cursor_x = 0;
         Editor.cursor_y = 0;
         Editor.row_offset = 0;
@@ -73,12 +68,8 @@ void open_help() {
 }
 
 void scroll_editor() {
-    if (Editor.cursor_y < Editor.row_offset) {
-        Editor.row_offset = Editor.cursor_y;
-    }
-    if (Editor.cursor_y >= Editor.row_offset + Editor.editor_rows) {
-        Editor.row_offset = Editor.cursor_y - Editor.editor_rows + 1;
-    }
+    if (Editor.cursor_y < Editor.row_offset) Editor.row_offset = Editor.cursor_y;
+    if (Editor.cursor_y >= Editor.row_offset + Editor.editor_rows) Editor.row_offset = Editor.cursor_y - Editor.editor_rows + 1;
 }
 
 char *prompt(const char *prompt) {
@@ -93,9 +84,7 @@ char *prompt(const char *prompt) {
     strncpy(static_prompt, prompt, sizeof(static_prompt) - 1);
     static_prompt[sizeof(static_prompt) - 1] = '\0';
     char *format_pos = strstr(static_prompt, "%s");
-    if (format_pos) {
-        *format_pos = '\0';
-    }
+    if (format_pos) *format_pos = '\0';
     int prompt_len = strlen(static_prompt);
     while(1) {
         buffer ab = BUFFER_INIT;
@@ -117,9 +106,7 @@ char *prompt(const char *prompt) {
         abfree(&ab);
         int c = input_read_key();
         if (c == '\r') {
-            if (buflen > 0) {
-                return buf;
-            }
+            if (buflen > 0) return buf;
             free(buf);
             return NULL;
         } else if (c == '\x1b') {

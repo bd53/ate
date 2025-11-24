@@ -13,6 +13,7 @@
 #include "keybinds.h"
 #include "search.h"
 #include "tree.h"
+#include "utf8.h"
 #include "utils.h"
 
 static int read_esc_sequence() {
@@ -53,9 +54,7 @@ static int read_esc_sequence() {
 int input_read_key() {
     int nread;
     char c;
-    while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
-        if (nread == -1 && errno != EAGAIN) die("read");
-    }
+    while ((nread = read(STDIN_FILENO, &c, 1)) != 1) if (nread == -1 && errno != EAGAIN) die("read");
     return (c == '\x1b') ? read_esc_sequence() : c;
 }
 
@@ -73,9 +72,7 @@ void cursor_move(int key) {
                 }
             } else if (Editor.cursor_y > 0) {
                 Editor.cursor_y--;
-                if (Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) {
-                    Editor.cursor_x = Editor.row[Editor.cursor_y].size;
-                }
+                if (Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) Editor.cursor_x = Editor.row[Editor.cursor_y].size;
             }
             break;
         case 1005:
@@ -111,9 +108,7 @@ void cursor_move(int key) {
     int len = row ? row->size : 0;
     if (Editor.cursor_x > len) Editor.cursor_x = len;
     if (row && Editor.cursor_x > 0 && Editor.cursor_x < row->size) {
-        if (!utf8_is_char_boundary(row->chars, Editor.cursor_x)) {
-            Editor.cursor_x = utf8_prev_char_boundary(row->chars, Editor.cursor_x);
-        }
+        if (!utf8_is_char_boundary(row->chars, Editor.cursor_x)) Editor.cursor_x = utf8_prev_char_boundary(row->chars, Editor.cursor_x);
     }
 }
 
@@ -184,9 +179,7 @@ static void handle_help(int c) {
         case '\x1b':
             run_cleanup();
             Editor.help_view = 0;
-            if (Editor.buffer_rows == 0) {
-                append_row("", 0);
-            }
+            if (Editor.buffer_rows == 0) append_row("", 0);
             break;
         case ':':
             Editor.mode = MODE_COMMAND;
@@ -273,9 +266,7 @@ static void handle_insert_mode(int c) {
             break;
         case '\t':
             Editor.modified = 1;
-            for (int i = 0; i < 4; i++) {
-                insert_character(' ');
-            }
+            for (int i = 0; i < 4; i++) insert_character(' ');
             break;
         case 127:
             delete_character();
@@ -298,13 +289,10 @@ static void handle_insert_mode(int c) {
                 else if ((uc & 0xF8) == 0xF0) char_len = 4;
                 for (int i = 1; i < char_len; i++) {
                     int next_byte = input_read_key();
-                    if (next_byte < 0x80 || next_byte > 0xBF) {
-                        return;
-                    }
+                    if (next_byte < 0x80 || next_byte > 0xBF) return;
                     utf8_buf[i] = (char)next_byte;
                 }
                 utf8_buf[char_len] = '\0';
-
                 Editor.modified = 1;
                 insert_utf8_character(utf8_buf, char_len);
             }
@@ -337,9 +325,7 @@ void process_keypress() {
             }
             break;
         case 1008:
-            if (Editor.mode == MODE_INSERT) {
-                delete_line();
-            }
+            if (Editor.mode == MODE_INSERT) delete_line();
             break;
         case '\x1b':
             if (Editor.mode == MODE_INSERT) {

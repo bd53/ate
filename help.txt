@@ -8,11 +8,16 @@ Close this window:   Use ":q<Enter>".
 
 Jump to a subject:   Type CTRL+ARROWKEYS. Repeat to go where you want.
 
-    Deleting text:   Delete the characters under the cursor with "d" until the 
+    Deleting text:   Delete the characters under the cursor with "d" until the
                      end of the line.
+Copy to clipboard:   Use "y" to yank the characters under the cursor.
 
 Explore directory:   Use CTRL+P, then <enter> to view contents of a directory
                      or file.
+
+  Find in project:   With CTRL+F you're able to query a search through your entire
+                     project workspace. Use "n" to find next, and "b" to go back.
+     Quick search:   Using CTRL+O you can quickly open a file of choice by name.
 
 ==============================================================================
 ATE COMMANDS

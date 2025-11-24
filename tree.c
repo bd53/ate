@@ -52,10 +52,8 @@ static void scan_directory(const char *path, int depth) {
     int temp_count = 0;
     int temp_capacity = 0;
     while ((entry = readdir(dir)) != NULL) {
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
-            continue;
-        if (entry->d_name[0] == '.')
-            continue;
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
+        if (entry->d_name[0] == '.') continue;
         char full_path[1024];
         snprintf(full_path, sizeof(full_path), "%s/%s", path, entry->d_name);
         struct stat st;
@@ -237,9 +235,7 @@ void open_file_tree() {
         Editor.file_tree = 0;
         Editor.help_view = 0;
         open_editor(file_paths[entry_index]);
-        if (Editor.buffer_rows == 0) {
-            append_row("", 0);
-        }
+        if (Editor.buffer_rows == 0) append_row("", 0);
         Editor.cursor_x = 0;
         Editor.cursor_y = 0;
         Editor.row_offset = 0;
@@ -250,9 +246,7 @@ void toggle_file_tree() {
     if (Editor.file_tree) {
         run_cleanup();
         Editor.file_tree = 0;
-        if (Editor.buffer_rows == 0) {
-            append_row("", 0);
-        }
+        if (Editor.buffer_rows == 0) append_row("", 0);
     } else {
         run_cleanup();
         Editor.file_tree = 1;

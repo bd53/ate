@@ -21,9 +21,7 @@ void execute_command(char *cmd) {
         run_cleanup();
         Editor.file_tree = 0;
         Editor.help_view = 0;
-        if (Editor.buffer_rows == 0) {
-            append_row("", 0);
-        }
+        if (Editor.buffer_rows == 0) append_row("", 0);
         Editor.cursor_x = 0;
         Editor.cursor_y = 0;
         Editor.row_offset = 0;
@@ -41,9 +39,7 @@ void execute_command(char *cmd) {
         toggle_file_tree();
     }
     else if (strcmp(cmd, "bd") == 0) {
-        if (Editor.file_tree) {
-            toggle_file_tree();
-        }
+        if (Editor.file_tree) toggle_file_tree();
     }
     else if (strncmp(cmd, "w", 1) == 0) {
         char *arg = NULL;
@@ -124,9 +120,7 @@ void command_mode() {
         int c = input_read_key();
         if (c == '\r') {
             Editor.mode = MODE_NORMAL;
-            if (buflen > 0) {
-                execute_command(buf);
-            }
+            if (buflen > 0) execute_command(buf);
             free(buf);
             refresh_screen();
             return;

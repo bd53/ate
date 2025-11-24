@@ -8,87 +8,8 @@
 #include "display.h"
 #include "search.h"
 #include "tree.h"
+#include "utf8.h"
 #include "utils.h"
-
-int utf8_char_len(const char *s, int max_len) {
-    if (s == NULL || max_len <= 0) return 0;
-    unsigned char c = (unsigned char)*s;
-    if (c < 0x80) return 1;
-    if (max_len < 2) return 0;
-    if ((c & 0xE0) == 0xC0) return 2;
-    if (max_len < 3) return 0;
-    if ((c & 0xF0) == 0xE0) return 3;
-    if (max_len < 4) return 0;
-    if ((c & 0xF8) == 0xF0) return 4;
-    return 0;
-}
-
-int utf8_decode(const char *s, int max_len, int *codepoint) {
-    if (s == NULL || max_len <= 0) return 0;
-    unsigned char c = (unsigned char)*s;
-    if (c < 0x80) {
-        *codepoint = c;
-        return 1;
-    }
-    if ((c & 0xE0) == 0xC0) {
-        if (max_len < 2 || (s[1] & 0xC0) != 0x80) return -1;
-        *codepoint = ((c & 0x1F) << 6) | (s[1] & 0x3F);
-        if (*codepoint < 0x80) return -1;
-        return 2;
-    }
-    if ((c & 0xF0) == 0xE0) {
-        if (max_len < 3 || (s[1] & 0xC0) != 0x80 || (s[2] & 0xC0) != 0x80) return -1;
-        *codepoint = ((c & 0x0F) << 12) | ((s[1] & 0x3F) << 6) | (s[2] & 0x3F);
-        if (*codepoint < 0x800 || (*codepoint >= 0xD800 && *codepoint <= 0xDFFF)) return -1;
-        return 3;
-    }
-    if ((c & 0xF8) == 0xF0) {
-        if (max_len < 4 || (s[1] & 0xC0) != 0x80 || (s[2] & 0xC0) != 0x80 || (s[3] & 0xC0) != 0x80) return -1;
-        *codepoint = ((c & 0x07) << 18) | ((s[1] & 0x3F) << 12) | ((s[2] & 0x3F) << 6) | (s[3] & 0x3F);
-        if (*codepoint < 0x10000 || *codepoint > 0x10FFFF) return -1;
-        return 4;
-    }
-    return -1;
-}
-
-int utf8_is_valid(int codepoint) {
-    if (codepoint >= 0xD800 && codepoint <= 0xDFFF) {
-        return 0;
-    }
-    if (codepoint >= 0x00 && codepoint <= 0x10FFFF) {
-        return 1;
-    }
-    return 0;
-}
-
-int utf8_is_char_boundary(const char *s, int byte_offset) {
-    if (s == NULL || byte_offset < 0) return 1;
-    if (s[byte_offset] == '\0') return 1;
-    unsigned char c = (unsigned char)s[byte_offset];
-    return (c & 0xC0) != 0x80;
-}
-
-int utf8_prev_char_boundary(const char *s, int byte_offset) {
-    if (byte_offset <= 0) return 0;
-    byte_offset--;
-    while (byte_offset > 0 && !utf8_is_char_boundary(s, byte_offset)) {
-        byte_offset--;
-    }
-    return byte_offset;
-}
-
-int utf8_next_char_boundary(const char *s, int byte_offset, int max_len) {
-    if (byte_offset >= max_len) return max_len;
-    int remaining_len = max_len - byte_offset;
-    int len = utf8_char_len(&s[byte_offset], remaining_len);
-    if (len == 0) {
-        if (remaining_len > 0) return byte_offset + 1;
-        return byte_offset;
-    }
-    byte_offset += len;
-    if (byte_offset > max_len) return max_len;
-    return byte_offset;
-}
 
 void free_rows() {
     for (int j = 0; j < Editor.buffer_rows; j++) {
@@ -165,26 +86,18 @@ void delete_row(int at) {
         } else {
             die("realloc (delete_row shrink)");
         }
-        if (Editor.cursor_y >= Editor.buffer_rows) {
-            Editor.cursor_y = Editor.buffer_rows - 1;
-        }
+        if (Editor.cursor_y >= Editor.buffer_rows) Editor.cursor_y = Editor.buffer_rows - 1;
     }
-    if (Editor.cursor_y < 0) {
-        Editor.cursor_y = 0;
-    }
+    if (Editor.cursor_y < 0) Editor.cursor_y = 0;
     Editor.modified = 1;
 }
 
 void insert_character(char c) {
-    if (Editor.cursor_y == Editor.buffer_rows) {
-        append_row("", 0);
-    }
+    if (Editor.cursor_y == Editor.buffer_rows) append_row("", 0);
     Row *row = &Editor.row[Editor.cursor_y];
     if (Editor.cursor_x < 0) Editor.cursor_x = 0;
     if (Editor.cursor_x > row->size) Editor.cursor_x = row->size;
-    if (!utf8_is_char_boundary(row->chars, Editor.cursor_x)) {
-        Editor.cursor_x = utf8_prev_char_boundary(row->chars, Editor.cursor_x);
-    }
+    if (!utf8_is_char_boundary(row->chars, Editor.cursor_x)) Editor.cursor_x = utf8_prev_char_boundary(row->chars, Editor.cursor_x);
     char *new_chars = realloc(row->chars, row->size + 2);
     if (!new_chars) die("realloc");
     row->chars = new_chars;
@@ -201,6 +114,7 @@ void insert_character(char c) {
     Editor.cursor_x++;
     Editor.modified = 1;
 }
+
 void insert_new_line() {
     if (Editor.cursor_y == Editor.buffer_rows) {
         append_row("", 0);
@@ -209,9 +123,7 @@ void insert_new_line() {
         int split_at = Editor.cursor_x;
         if (split_at < 0) split_at = 0;
         if (split_at > row->size) split_at = row->size;
-        if (!utf8_is_char_boundary(row->chars, split_at)) {
-            split_at = utf8_prev_char_boundary(row->chars, split_at);
-        }
+        if (!utf8_is_char_boundary(row->chars, split_at)) split_at = utf8_prev_char_boundary(row->chars, split_at);
         int second_half_len = row->size - split_at;
         char *second_half = malloc(second_half_len + 1);
         if (!second_half) die("malloc");
@@ -278,20 +190,14 @@ void delete_character() {
 }
 
 void insert_utf8_character(const char *utf8_char, int char_len) {
-    if (Editor.cursor_y == Editor.buffer_rows) {
-        append_row("", 0);
-    }
+    if (Editor.cursor_y == Editor.buffer_rows) append_row("", 0);
     Row *row = &Editor.row[Editor.cursor_y];
     if (Editor.cursor_x < 0) Editor.cursor_x = 0;
     if (Editor.cursor_x > row->size) Editor.cursor_x = row->size;
-    if (!utf8_is_char_boundary(row->chars, Editor.cursor_x)) {
-        Editor.cursor_x = utf8_prev_char_boundary(row->chars, Editor.cursor_x);
-    }
+    if (!utf8_is_char_boundary(row->chars, Editor.cursor_x)) Editor.cursor_x = utf8_prev_char_boundary(row->chars, Editor.cursor_x);
     int codepoint;
     int decoded_len = utf8_decode(utf8_char, char_len, &codepoint);
-    if (decoded_len != char_len || !utf8_is_valid(codepoint)) {
-        return;
-    }
+    if (decoded_len != char_len || !utf8_is_valid(codepoint)) return;
     char *new_chars = realloc(row->chars, row->size + char_len + 1);
     if (!new_chars) die("realloc");
     row->chars = new_chars;
@@ -304,9 +210,7 @@ void insert_utf8_character(const char *utf8_char, int char_len) {
     if (!new_hl) die("realloc");
     row->state = new_hl;
     memmove(&row->state[Editor.cursor_x + char_len], &row->state[Editor.cursor_x], row->size - Editor.cursor_x - char_len);
-    for (int i = 0; i < char_len; i++) {
-        row->state[Editor.cursor_x + i] = 0;
-    }
+    for (int i = 0; i < char_len; i++) row->state[Editor.cursor_x + i] = 0;
     Editor.cursor_x += char_len;
     Editor.modified = 1;
 }
@@ -420,9 +324,7 @@ void draw_content(buffer *ab) {
                     int hl = row->state[i];
                     int match_col = Editor.found_col;
                     int query_len = Editor.query ? strlen(Editor.query) : 0;
-                    if (Editor.query && filerow == Editor.found_row && i >= match_col && i < match_col + query_len) {
-                        hl = 1;
-                    }
+                    if (Editor.query && filerow == Editor.found_row && i >= match_col && i < match_col + query_len) hl = 1;
                     if (hl != current_hl) {
                         current_hl = hl;
                         char *color_code = (hl == 1) ? "\x1b[45m" : "\x1b[0m";

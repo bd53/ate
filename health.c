@@ -50,9 +50,7 @@ static int check_command(const char *cmd, char *output_buf, size_t buf_size, con
     char command[512];
     FILE *fp = NULL;
     snprintf(command, sizeof(command), "command -v %s > /dev/null 2>&1", cmd);
-    if (system(command) != 0) {
-        return 0;
-    }
+    if (system(command) != 0) return 0;
     if (version_flag && output_buf) {
         snprintf(command, sizeof(command), "%s %s 2>&1 | head -n 1", cmd, version_flag);
         fp = popen(command, "r");
@@ -125,9 +123,7 @@ static void check_language_support() {
         } else {
             append_health_line(0, "WARNING %s: not available", name);
             append_advice("spawn: %s failed with exit code - and signal -. Could not find executable \"%s\" in PATH.", cmd, cmd);
-            if (i < sizeof(languages) / sizeof(languages[0]) - 1) {
-                append_row("", 0);
-            }
+            if (i < sizeof(languages) / sizeof(languages[0]) - 1) append_row("", 0);
         }
     }
 }

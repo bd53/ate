@@ -61,8 +61,7 @@ static void collect_and_search_files(const char *dirpath, const char *query, int
     if (!dir) return;
     struct dirent *entry;
     while ((entry = readdir(dir)) != NULL) {
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
-            continue;
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
         if (entry->d_name[0] == '.') continue;
         char full_path[2048];
         size_t dirpath_len = strlen(dirpath);
@@ -206,12 +205,8 @@ void workspace_find_next(int direction) {
     char *result_filepath = filepaths[index];
     int result_row = rows[index];
     int result_col = cols[index];
-    if (Editor.modified && Editor.filename) {
-        save_file();
-    }
-    if (Editor.filename == NULL || strcmp(Editor.filename, result_filepath) != 0) {
-        open_editor(result_filepath);
-    }
+    if (Editor.modified && Editor.filename) save_file();
+    if (Editor.filename == NULL || strcmp(Editor.filename, result_filepath) != 0) open_editor(result_filepath);
     if (result_row >= 0 && result_row < Editor.buffer_rows) {
         Editor.cursor_y = result_row;
         Editor.cursor_x = result_col;
