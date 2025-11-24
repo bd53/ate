@@ -96,27 +96,26 @@ void command_mode() {
     while(1) {
         scroll_editor();
         buffer ab = BUFFER_INIT;
-        abinit(&ab);
-        abappend(&ab, "\x1b[?25l", 6);
-        abappend(&ab, "\x1b[H", 3);
+        append(&ab, "\x1b[?25l", 6);
+        append(&ab, "\x1b[H", 3);
         draw_content(&ab);
         draw_status(&ab);
         char pos_buf[32];
         snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;1H", prompt_row);
-        abappend(&ab, pos_buf, strlen(pos_buf));
-        abappend(&ab, "\x1b[K", 3);
-        abappend(&ab, ":", 1);
-        abappend(&ab, buf, buflen);
+        append(&ab, pos_buf, strlen(pos_buf));
+        append(&ab, "\x1b[K", 3);
+        append(&ab, ":", 1);
+        append(&ab, buf, buflen);
         int cursor_col = buflen + 2;
         snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;%dH", prompt_row, cursor_col);
-        abappend(&ab, pos_buf, strlen(pos_buf));
-        abappend(&ab, "\x1b[?25h", 6);
+        append(&ab, pos_buf, strlen(pos_buf));
+        append(&ab, "\x1b[?25h", 6);
         if (write(STDOUT_FILENO, ab.b, ab.length) == -1) {
-            abfree(&ab);
+            free(ab.b);
             free(buf);
             die("write");
         }
-        abfree(&ab);
+        free(ab.b);
         int c = input_read_key();
         if (c == '\r') {
             Editor.mode = MODE_NORMAL;

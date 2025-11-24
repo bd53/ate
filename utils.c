@@ -80,13 +80,7 @@ int get_window_size(int *rows, int *cols) {
     }
 }
 
-void abinit(buffer *ab) {
-    if (ab == NULL) return;
-    ab->b = NULL;
-    ab->length = 0;
-}
-
-void abappend(buffer *ab, const char *s, int len) {
+void append(buffer *ab, const char *s, int len) {
     if (ab == NULL || s == NULL || len < 0) return;
     if (len == 0) return;
     char *new = realloc(ab->b, ab->length + len);
@@ -94,13 +88,6 @@ void abappend(buffer *ab, const char *s, int len) {
     memcpy(&new[ab->length], s, len);
     ab->b = new;
     ab->length += len;
-}
-
-void abfree(buffer *ab) {
-    if (ab == NULL) return;
-    free(ab->b);
-    ab->b = NULL;
-    ab->length = 0;
 }
 
 int leading_whitespace(const char *line, int len) {

@@ -12,7 +12,6 @@ void insert_character(char c);
 void insert_new_line();
 void auto_dedent();
 void delete_character();
-void insert_utf8_character(const char *utf8_char, int char_len);
 void yank_line();
 void delete_line();
 void draw_content(buffer *ab);

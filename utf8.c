@@ -1,6 +1,11 @@
 #include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
+#include "common.h"
 #include "utf8.h"
+#include "utils.h"
 
 // https://github.com/torvalds/uemacs/blob/master/utf8.c#L16
 unsigned utf8_to_unicode(const char *line, unsigned index, unsigned len, unicode_t *res) {
@@ -30,11 +35,7 @@ unsigned utf8_to_unicode(const char *line, unsigned index, unsigned len, unicode
         if ((c & 0xc0) != 0x80) return 1;
         value = (value << 6) | (c & 0x3f);
     }
-    if ((bytes == 2 && value < 0x80) ||
-        (bytes == 3 && value < 0x800) ||
-        (bytes == 4 && value < 0x10000)) {
-        return 1;
-    }
+    if ((bytes == 2 && value < 0x80) || (bytes == 3 && value < 0x800) || (bytes == 4 && value < 0x10000)) return 1;
     if (value >= 0xD800 && value <= 0xDFFF) return 1;
     if (value > 0x10FFFF) return 1;
     *res = value;
@@ -151,4 +152,30 @@ int utf8_next_char_boundary(const char *s, int byte_offset, int max_len) {
     if (len == 0) return (byte_offset + 1 > max_len) ? max_len : byte_offset + 1;
     byte_offset += len;
     return (byte_offset > max_len) ? max_len : byte_offset;
+}
+
+void insert_utf8_character(const char *utf8_char, int char_len) {
+    if (Editor.cursor_y == Editor.buffer_rows) append_row("", 0);
+    Row *row = &Editor.row[Editor.cursor_y];
+    if (Editor.cursor_x < 0) Editor.cursor_x = 0;
+    if (Editor.cursor_x > row->size) Editor.cursor_x = row->size;
+    if (!utf8_is_char_boundary(row->chars, Editor.cursor_x)) Editor.cursor_x = utf8_prev_char_boundary(row->chars, Editor.cursor_x);
+    int codepoint;
+    int decoded_len = utf8_decode(utf8_char, char_len, &codepoint);
+    if (decoded_len != char_len || !utf8_is_valid(codepoint)) return;
+    char *new_chars = realloc(row->chars, row->size + char_len + 1);
+    if (!new_chars) die("realloc");
+    row->chars = new_chars;
+    memmove(&row->chars[Editor.cursor_x + char_len], &row->chars[Editor.cursor_x], row->size - Editor.cursor_x + 1);
+    memcpy(&row->chars[Editor.cursor_x], utf8_char, char_len);
+    row->size += char_len;
+    row->chars[row->size] = '\0';
+    int new_hl_size = row->size > 0 ? row->size : 1;
+    unsigned char *new_hl = realloc(row->state, new_hl_size);
+    if (!new_hl) die("realloc");
+    row->state = new_hl;
+    memmove(&row->state[Editor.cursor_x + char_len], &row->state[Editor.cursor_x], row->size - Editor.cursor_x - char_len);
+    for (int i = 0; i < char_len; i++) row->state[Editor.cursor_x + i] = 0;
+    Editor.cursor_x += char_len;
+    Editor.modified = 1;
 }

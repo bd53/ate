@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <limits.h>
 
 #include "common.h"
 #include "content.h"
@@ -10,6 +11,10 @@
 #include "tree.h"
 #include "utf8.h"
 #include "utils.h"
+
+// for those who want to use 8
+// tabs you can have a blast!
+#define INDENT_SIZE 4
 
 void free_rows() {
     for (int j = 0; j < Editor.buffer_rows; j++) {
@@ -81,11 +86,7 @@ void delete_row(int at) {
         Editor.cursor_y = 0;
     } else {
         Row *new_rows = realloc(Editor.row, sizeof(Row) * Editor.buffer_rows);
-        if (new_rows) {
-            Editor.row = new_rows;
-        } else {
-            die("realloc (delete_row shrink)");
-        }
+        if (new_rows) Editor.row = new_rows;
         if (Editor.cursor_y >= Editor.buffer_rows) Editor.cursor_y = Editor.buffer_rows - 1;
     }
     if (Editor.cursor_y < 0) Editor.cursor_y = 0;
@@ -109,7 +110,7 @@ void insert_character(char c) {
     unsigned char *new_hl = realloc(row->state, new_hl_size);
     if (!new_hl) die("realloc");
     row->state = new_hl;
-    memmove(&row->state[Editor.cursor_x + 1], &row->state[Editor.cursor_x], row->size - Editor.cursor_x - 1);
+    if (Editor.cursor_x < row->size - 1) memmove(&row->state[Editor.cursor_x + 1], &row->state[Editor.cursor_x], row->size - Editor.cursor_x - 1);
     row->state[Editor.cursor_x] = 0;
     Editor.cursor_x++;
     Editor.modified = 1;
@@ -190,9 +191,9 @@ void insert_new_line() {
         }
         int final_indent = indent_spaces;
         if (add_extra_indent && !dedent) {
-            final_indent += 4;
-        } else if (dedent && final_indent >= 4) {
-            final_indent -= 4;
+            final_indent += INDENT_SIZE;
+        } else if (dedent && final_indent >= INDENT_SIZE) {
+            final_indent -= INDENT_SIZE;
         }
         for (int i = 0; i < final_indent; i++) {
             insert_character(' ');
@@ -215,8 +216,8 @@ void auto_dedent() {
     }
     if (only_whitespace) {
         int leading_spaces = leading_whitespace(row->chars, row->size);
-        if (leading_spaces >= 4) {
-            trim_leadingspace(4);
+        if (leading_spaces >= INDENT_SIZE) {
+            trim_leadingspace(INDENT_SIZE);
         }
     }
 }
@@ -258,32 +259,6 @@ void delete_character() {
     }
 }
 
-void insert_utf8_character(const char *utf8_char, int char_len) {
-    if (Editor.cursor_y == Editor.buffer_rows) append_row("", 0);
-    Row *row = &Editor.row[Editor.cursor_y];
-    if (Editor.cursor_x < 0) Editor.cursor_x = 0;
-    if (Editor.cursor_x > row->size) Editor.cursor_x = row->size;
-    if (!utf8_is_char_boundary(row->chars, Editor.cursor_x)) Editor.cursor_x = utf8_prev_char_boundary(row->chars, Editor.cursor_x);
-    int codepoint;
-    int decoded_len = utf8_decode(utf8_char, char_len, &codepoint);
-    if (decoded_len != char_len || !utf8_is_valid(codepoint)) return;
-    char *new_chars = realloc(row->chars, row->size + char_len + 1);
-    if (!new_chars) die("realloc");
-    row->chars = new_chars;
-    memmove(&row->chars[Editor.cursor_x + char_len], &row->chars[Editor.cursor_x], row->size - Editor.cursor_x + 1);
-    memcpy(&row->chars[Editor.cursor_x], utf8_char, char_len);
-    row->size += char_len;
-    row->chars[row->size] = '\0';
-    int new_hl_size = row->size > 0 ? row->size : 1;
-    unsigned char *new_hl = realloc(row->state, new_hl_size);
-    if (!new_hl) die("realloc");
-    row->state = new_hl;
-    memmove(&row->state[Editor.cursor_x + char_len], &row->state[Editor.cursor_x], row->size - Editor.cursor_x - char_len);
-    for (int i = 0; i < char_len; i++) row->state[Editor.cursor_x + i] = 0;
-    Editor.cursor_x += char_len;
-    Editor.modified = 1;
-}
-
 void yank_line() {
     if (Editor.cursor_y < 0 || Editor.cursor_y >= Editor.buffer_rows) return;
     Row *row = &Editor.row[Editor.cursor_y];
@@ -314,7 +289,6 @@ void yank_line() {
     display_message(1, msg);
 }
 
-
 void delete_line() {
     if (Editor.buffer_rows > 0 && Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) {
         Row *row = &Editor.row[Editor.cursor_y];
@@ -338,6 +312,7 @@ void delete_line() {
 
 void draw_content(buffer *ab) {
     if (!ab) return;
+    if (!Editor.row && Editor.buffer_rows > 0) return;
     int file_content_rows = Editor.editor_rows;
     int max_num = Editor.buffer_rows > file_content_rows ? Editor.buffer_rows : file_content_rows;
     Editor.gutter_width = 1;
@@ -356,11 +331,11 @@ void draw_content(buffer *ab) {
             char line_num_buf[32];
             int line_num_len;
             if (!Editor.file_tree) {
-                abappend(ab, "\x1b[38;5;244m", 11);
+                append(ab, "\x1b[38;5;244m", 11);
                 if (wrap_line == 0) {
                     if (Editor.mode == MODE_NORMAL) {
                         if (filerow == Editor.cursor_y) {
-                            abappend(ab, "\x1b[33m", 5);
+                            append(ab, "\x1b[33m", 5);
                             line_num_len = snprintf(line_num_buf, sizeof(line_num_buf), "%*s ", Editor.gutter_width - 1, ">>");
                         } else {
                             int rel_num = abs(filerow - Editor.cursor_y);
@@ -373,17 +348,17 @@ void draw_content(buffer *ab) {
                 } else {
                     line_num_len = snprintf(line_num_buf, sizeof(line_num_buf), "%*s ", Editor.gutter_width - 1, "");
                 }
-                abappend(ab, line_num_buf, line_num_len);
-                abappend(ab, "\x1b[m", 3);
+                append(ab, line_num_buf, line_num_len);
+                append(ab, "\x1b[m", 3);
             }
             int start_idx = wrap_line * content_width;
             int end_idx = start_idx + content_width;
             if (end_idx > row->size) end_idx = row->size;
             if (Editor.file_tree) {
                 if (filerow < 3) {
-                    abappend(ab, "\x1b[34m", 5);
+                    append(ab, "\x1b[34m", 5);
                 } else if (filerow == Editor.cursor_y) {
-                    abappend(ab, "\x1b[7m", 4);
+                    append(ab, "\x1b[7m", 4);
                 }
             }
             int current_hl = 0;
@@ -392,31 +367,31 @@ void draw_content(buffer *ab) {
                 if (!Editor.file_tree) {
                     int hl = row->state[i];
                     int match_col = Editor.found_col;
-                    int query_len = Editor.query ? strlen(Editor.query) : 0;
+                    int query_len = (Editor.query != NULL) ? strlen(Editor.query) : 0;
                     if (Editor.query && filerow == Editor.found_row && i >= match_col && i < match_col + query_len) hl = 1;
                     if (hl != current_hl) {
                         current_hl = hl;
                         char *color_code = (hl == 1) ? "\x1b[45m" : "\x1b[0m";
-                        abappend(ab, color_code, strlen(color_code));
+                        append(ab, color_code, strlen(color_code));
                     }
                 }
-                abappend(ab, &c, 1);
+                append(ab, &c, 1);
             }
-            abappend(ab, "\x1b[m", 3);
-            abappend(ab, "\x1b[K", 3);
-            abappend(ab, "\r\n", 2);
+            append(ab, "\x1b[m", 3);
+            append(ab, "\x1b[K", 3);
+            append(ab, "\r\n", 2);
         }
     }
     while (screen_row < file_content_rows) {
         if (!Editor.file_tree) {
-            abappend(ab, "\x1b[38;5;244m", 11);
+            append(ab, "\x1b[38;5;244m", 11);
             char line_num_buf[32];
             int line_num_len = snprintf(line_num_buf, sizeof(line_num_buf), "%*s", Editor.gutter_width, "~");
-            abappend(ab, line_num_buf, line_num_len);
-            abappend(ab, "\x1b[m", 3);
+            append(ab, line_num_buf, line_num_len);
+            append(ab, "\x1b[m", 3);
         }
-        abappend(ab, "\x1b[K", 3);
-        abappend(ab, "\r\n", 2);
+        append(ab, "\x1b[K", 3);
+        append(ab, "\r\n", 2);
         screen_row++;
     }
 }

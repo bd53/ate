@@ -12,5 +12,6 @@ int utf8_is_valid(int codepoint);
 int utf8_is_char_boundary(const char *s, int byte_offset);
 int utf8_prev_char_boundary(const char *s, int byte_offset);
 int utf8_next_char_boundary(const char *s, int byte_offset, int max_len);
+void insert_utf8_character(const char *utf8_char, int char_len);
 
 #endif

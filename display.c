@@ -88,22 +88,21 @@ char *prompt(const char *prompt) {
     int prompt_len = strlen(static_prompt);
     while(1) {
         buffer ab = BUFFER_INIT;
-        abinit(&ab);
         char pos_buf[32];
         snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;1H", prompt_row);
-        abappend(&ab, pos_buf, strlen(pos_buf));
-        abappend(&ab, "\x1b[K", 3);
-        abappend(&ab, static_prompt, prompt_len);
-        abappend(&ab, buf, buflen);
+        append(&ab, pos_buf, strlen(pos_buf));
+        append(&ab, "\x1b[K", 3);
+        append(&ab, static_prompt, prompt_len);
+        append(&ab, buf, buflen);
         int cursor_col = prompt_len + buflen + 1;
         snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;%dH", prompt_row, cursor_col);
-        abappend(&ab, pos_buf, strlen(pos_buf));
+        append(&ab, pos_buf, strlen(pos_buf));
         if (write(STDOUT_FILENO, ab.b, ab.length) == -1) {
-            abfree(&ab);
+            free(ab.b);
             free(buf);
             die("write");
         }
-        abfree(&ab);
+        free(ab.b);
         int c = input_read_key();
         if (c == '\r') {
             if (buflen > 0) return buf;
@@ -138,7 +137,7 @@ char *prompt(const char *prompt) {
 
 void draw_status(buffer *ab) {
     if (ab == NULL) return;
-    abappend(ab, "\x1b[7m", 4);
+    append(ab, "\x1b[7m", 4);
     char status[80];
     const char *filetype_name = "txt";
     char filename_status[64];
@@ -154,24 +153,23 @@ void draw_status(buffer *ab) {
     else mode_str = "UNKNOWN";
     int len = snprintf(status, sizeof(status), " %s | %s | R:%d L:%d", mode_str, filename_status, Editor.cursor_y + 1, Editor.buffer_rows > 0 ? Editor.buffer_rows : 1);
     if (len > Editor.editor_cols) len = Editor.editor_cols;
-    abappend(ab, status, len);
+    append(ab, status, len);
     char rstatus[80];
     int rlen = snprintf(rstatus, sizeof(rstatus), " %s | C:%d ", filetype_name, Editor.cursor_x + 1);
     while (len < Editor.editor_cols - rlen) {
-        abappend(ab, " ", 1);
+        append(ab, " ", 1);
         len++;
     }
-    abappend(ab, rstatus, rlen);
-    abappend(ab, "\x1b[m", 3);
-    abappend(ab, "\r\n", 2);
+    append(ab, rstatus, rlen);
+    append(ab, "\x1b[m", 3);
+    append(ab, "\r\n", 2);
 }
 
 void refresh_screen() {
     scroll_editor();
     buffer ab = BUFFER_INIT;
-    abinit(&ab);
-    abappend(&ab, "\x1b[?25l", 6);
-    abappend(&ab, "\x1b[H", 3);
+    append(&ab, "\x1b[?25l", 6);
+    append(&ab, "\x1b[H", 3);
     draw_content(&ab);
     draw_status(&ab);
     int content_width = Editor.editor_cols - Editor.gutter_width;
@@ -190,15 +188,15 @@ void refresh_screen() {
     int cur_y = screen_row + 1;
     char buf[32];
     snprintf(buf, sizeof(buf), "\x1b[%d;%dH", cur_y, cur_x);
-    abappend(&ab, buf, strlen(buf));
+    append(&ab, buf, strlen(buf));
     if (Editor.mode == MODE_INSERT) {
-        abappend(&ab, "\x1b[5 q", 5);
+        append(&ab, "\x1b[5 q", 5);
     } else {
-        abappend(&ab, "\x1b[2 q", 5);
+        append(&ab, "\x1b[2 q", 5);
     }
-    abappend(&ab, "\x1b[?25h", 6);
+    append(&ab, "\x1b[?25h", 6);
     if (write(STDOUT_FILENO, ab.b, ab.length) == -1) die("write");
-    abfree(&ab);
+    free(ab.b);
 }
 
 void display_message(int type, const char *message) {
