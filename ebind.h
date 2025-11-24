@@ -37,6 +37,7 @@ enum Codes {
 #define KEY_FIND_PREV 'b'
 #define KEY_YANK_LINE 'y'
 #define KEY_DELETE_LINE 'd'
+#define KEY_GO_TO_LINE CTRL_KEY('g')
 
 /* insert mode */
 #define KEY_BACKSPACE_ASCII 127

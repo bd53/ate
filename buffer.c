@@ -276,18 +276,11 @@ void yank_line() {
     write(STDOUT_FILENO, encoded, strlen(encoded));
     write(STDOUT_FILENO, trailer, strlen(trailer));
     free(encoded);
-    char msg[512];
-    int display_len = (row->size > 50) ? 50 : row->size;
-    snprintf(msg, sizeof(msg), "Yanked: '%.*s%s'", display_len, row->chars, (row->size > 50) ? "..." : "");
-    display_message(1, msg);
+    display_message(1, "Yanked");
 }
 
 void delete_line() {
     if (Editor.buffer_rows > 0 && Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) {
-        struct Row *row = &Editor.row[Editor.cursor_y];
-        char saved_line[512];
-        int display_len = (row->size > 50) ? 50 : row->size;
-        snprintf(saved_line, sizeof(saved_line), "%.*s%s", display_len, row->chars, (row->size > 50) ? "..." : "");
         delete_row(Editor.cursor_y);
         if (Editor.buffer_rows == 0) {
             Editor.cursor_y = 0;
@@ -297,10 +290,32 @@ void delete_line() {
         if (Editor.cursor_y < 0) Editor.cursor_y = 0;
         Editor.cursor_x = 0;
         Editor.modified = 1;
-        char msg[600];
-        snprintf(msg, sizeof(msg), "Deleted: '%s'", saved_line);
-        display_message(2, msg);
+        display_message(2, "Deleted");
     }
+}
+
+void goto_line() {
+    char *command = prompt("Go to line: ");
+    if (command == NULL) {
+        Editor.mode = 0;
+        refresh_screen();
+        return;
+    }
+    char *endptr;
+    long line_number = strtol(command, &endptr, 10);
+    if (*endptr == '\0' && line_number > 0 && line_number <= Editor.buffer_rows) {
+        int target_row = (int)line_number - 1;
+        Editor.cursor_y = target_row;
+        Editor.cursor_x = 0;
+        if (Editor.cursor_y < Editor.row_offset) Editor.row_offset = Editor.cursor_y;
+        if (Editor.cursor_y >= Editor.row_offset + Editor.editor_rows)  Editor.row_offset = Editor.cursor_y - Editor.editor_rows + 1;
+        refresh_screen();
+        display_message(2, "Jumped");
+    } else {
+        display_message(1, "Invalid");
+    }
+    free(command);
+    Editor.mode = 0;
 }
 
 void draw_content(struct Buffer *ab) {

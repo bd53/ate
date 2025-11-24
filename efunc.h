@@ -19,6 +19,7 @@ void auto_dedent();
 void delete_character();
 void yank_line();
 void delete_line();
+void goto_line();
 void draw_content(struct Buffer *ab);
 void command_mode();
 void execute_command(char *cmd);

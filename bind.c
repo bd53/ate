@@ -237,14 +237,17 @@ static void handle_normal_mode(int c) {
         case KEY_YANK_LINE:
             yank_line();
             break;
+        case KEY_DELETE_LINE:
+            delete_line();
+            break;
+        case KEY_GO_TO_LINE:
+            goto_line();
+            return;
         case KEY_MOVE_LEFT:
         case KEY_MOVE_DOWN:
         case KEY_MOVE_UP:
         case KEY_MOVE_RIGHT:
             cursor_move(translate_key(c));
-            break;
-        case KEY_DELETE_LINE:
-            delete_line();
             break;
     }
 }
