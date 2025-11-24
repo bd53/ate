@@ -60,7 +60,7 @@ int input_read_key() {
 }
 
 void cursor_move(int key) {
-    Row *row = (Editor.curor_y >= 0 && Editor.curor_y < Editor.buffer_rows) ? &Editor.row[Editor.curor_y] : NULL;
+    Row *row = (Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) ? &Editor.row[Editor.cursor_y] : NULL;
     Editor.found_row = -1;
     Editor.found_col = -1;
     switch (key) {
@@ -71,26 +71,26 @@ void cursor_move(int key) {
                 } else {
                     Editor.cursor_x--;
                 }
-            } else if (Editor.curor_y > 0) {
-                Editor.curor_y--;
-                if (Editor.curor_y >= 0 && Editor.curor_y < Editor.buffer_rows) {
-                    Editor.cursor_x = Editor.row[Editor.curor_y].size;
+            } else if (Editor.cursor_y > 0) {
+                Editor.cursor_y--;
+                if (Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) {
+                    Editor.cursor_x = Editor.row[Editor.cursor_y].size;
                 }
             }
             break;
         case 1005:
             if (row && Editor.cursor_x < row->size) {
                 Editor.cursor_x = utf8_next_char_boundary(row->chars, Editor.cursor_x, row->size);
-            } else if (row && Editor.cursor_x == row->size && Editor.curor_y < Editor.buffer_rows - 1) {
-                Editor.curor_y++;
+            } else if (row && Editor.cursor_x == row->size && Editor.cursor_y < Editor.buffer_rows - 1) {
+                Editor.cursor_y++;
                 Editor.cursor_x = 0;
             }
             break;
         case 1002:
-            if (Editor.curor_y > 0) Editor.curor_y--;
+            if (Editor.cursor_y > 0) Editor.cursor_y--;
             break;
         case 1003:
-            if (Editor.curor_y < Editor.buffer_rows - 1) Editor.curor_y++;
+            if (Editor.cursor_y < Editor.buffer_rows - 1) Editor.cursor_y++;
             break;
         case 1000:
             Editor.cursor_x = 0;
@@ -101,13 +101,13 @@ void cursor_move(int key) {
         case 1006:
         case 1007: {
             int jump = (Editor.editor_rows / 7 < 1) ? 1 : Editor.editor_rows / 7;
-            Editor.curor_y += (key == 1006) ? -jump : jump;
-            if (Editor.curor_y < 0) Editor.curor_y = 0;
-            if (Editor.curor_y >= Editor.buffer_rows) Editor.curor_y = Editor.buffer_rows - 1;
+            Editor.cursor_y += (key == 1006) ? -jump : jump;
+            if (Editor.cursor_y < 0) Editor.cursor_y = 0;
+            if (Editor.cursor_y >= Editor.buffer_rows) Editor.cursor_y = Editor.buffer_rows - 1;
             break;
         }
     }
-    row = (Editor.buffer_rows > 0 && Editor.curor_y >= 0 && Editor.curor_y < Editor.buffer_rows) ? &Editor.row[Editor.curor_y] : NULL;
+    row = (Editor.buffer_rows > 0 && Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) ? &Editor.row[Editor.cursor_y] : NULL;
     int len = row ? row->size : 0;
     if (Editor.cursor_x > len) Editor.cursor_x = len;
     if (row && Editor.cursor_x > 0 && Editor.cursor_x < row->size) {
@@ -344,8 +344,8 @@ void process_keypress() {
         case '\x1b':
             if (Editor.mode == MODE_INSERT) {
                 Editor.mode = MODE_NORMAL;
-                if (Editor.cursor_x > 0 && Editor.curor_y >= 0 && Editor.curor_y < Editor.buffer_rows) {
-                    Row *row = &Editor.row[Editor.curor_y];
+                if (Editor.cursor_x > 0 && Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) {
+                    Row *row = &Editor.row[Editor.cursor_y];
                     Editor.cursor_x = utf8_prev_char_boundary(row->chars, Editor.cursor_x);
                 }
             } else if (Editor.mode == MODE_COMMAND) {

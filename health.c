@@ -225,7 +225,7 @@ void check_health() {
     check_clipboard();
     Editor.help_view = 1;
     Editor.cursor_x = 0;
-    Editor.curor_y = 0;
+    Editor.cursor_y = 0;
     Editor.row_offset = 0;
     refresh_screen();
 }

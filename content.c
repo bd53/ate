@@ -157,7 +157,7 @@ void delete_row(int at) {
     if (Editor.buffer_rows == 0) {
         free(Editor.row);
         Editor.row = NULL;
-        Editor.curor_y = 0;
+        Editor.cursor_y = 0;
     } else {
         Row *new_rows = realloc(Editor.row, sizeof(Row) * Editor.buffer_rows);
         if (new_rows) {
@@ -165,21 +165,21 @@ void delete_row(int at) {
         } else {
             die("realloc (delete_row shrink)");
         }
-        if (Editor.curor_y >= Editor.buffer_rows) {
-            Editor.curor_y = Editor.buffer_rows - 1;
+        if (Editor.cursor_y >= Editor.buffer_rows) {
+            Editor.cursor_y = Editor.buffer_rows - 1;
         }
     }
-    if (Editor.curor_y < 0) {
-        Editor.curor_y = 0;
+    if (Editor.cursor_y < 0) {
+        Editor.cursor_y = 0;
     }
     Editor.modified = 1;
 }
 
 void insert_character(char c) {
-    if (Editor.curor_y == Editor.buffer_rows) {
+    if (Editor.cursor_y == Editor.buffer_rows) {
         append_row("", 0);
     }
-    Row *row = &Editor.row[Editor.curor_y];
+    Row *row = &Editor.row[Editor.cursor_y];
     if (Editor.cursor_x < 0) Editor.cursor_x = 0;
     if (Editor.cursor_x > row->size) Editor.cursor_x = row->size;
     if (!utf8_is_char_boundary(row->chars, Editor.cursor_x)) {
@@ -202,10 +202,10 @@ void insert_character(char c) {
     Editor.modified = 1;
 }
 void insert_new_line() {
-    if (Editor.curor_y == Editor.buffer_rows) {
+    if (Editor.cursor_y == Editor.buffer_rows) {
         append_row("", 0);
     } else {
-        Row *row = &Editor.row[Editor.curor_y];
+        Row *row = &Editor.row[Editor.cursor_y];
         int split_at = Editor.cursor_x;
         if (split_at < 0) split_at = 0;
         if (split_at > row->size) split_at = row->size;
@@ -232,22 +232,22 @@ void insert_new_line() {
             die("realloc");
         }
         row->state = new_hl;
-        insert_row(Editor.curor_y + 1, second_half, second_half_len);
+        insert_row(Editor.cursor_y + 1, second_half, second_half_len);
         free(second_half);
     }
-    Editor.curor_y++;
+    Editor.cursor_y++;
     Editor.cursor_x = 0;
     Editor.modified = 1;
 }
 
 void delete_character() {
-    if (Editor.cursor_x == 0 && Editor.curor_y == 0) return;
-    if (Editor.curor_y >= Editor.buffer_rows) return;
+    if (Editor.cursor_x == 0 && Editor.cursor_y == 0) return;
+    if (Editor.cursor_y >= Editor.buffer_rows) return;
     if (Editor.cursor_x == 0) {
-        if (Editor.curor_y == 0) return;
-        Editor.curor_y--;
-        Row *row = &Editor.row[Editor.curor_y];
-        Row *next_row = &Editor.row[Editor.curor_y + 1];
+        if (Editor.cursor_y == 0) return;
+        Editor.cursor_y--;
+        Row *row = &Editor.row[Editor.cursor_y];
+        Row *next_row = &Editor.row[Editor.cursor_y + 1];
         Editor.cursor_x = row->size;
         char *new_chars = realloc(row->chars, row->size + next_row->size + 1);
         if (!new_chars) die("realloc");
@@ -259,10 +259,10 @@ void delete_character() {
         if (!new_hl) die("realloc");
         row->state = new_hl;
         memcpy(&row->state[Editor.cursor_x], next_row->state, next_row->size);
-        delete_row(Editor.curor_y + 1);
+        delete_row(Editor.cursor_y + 1);
         Editor.modified = 1;
     } else {
-        Row *row = &Editor.row[Editor.curor_y];
+        Row *row = &Editor.row[Editor.cursor_y];
         int prev_pos = utf8_prev_char_boundary(row->chars, Editor.cursor_x);
         int char_len = Editor.cursor_x - prev_pos;
         memmove(&row->chars[prev_pos], &row->chars[Editor.cursor_x], row->size - Editor.cursor_x + 1);
@@ -278,10 +278,10 @@ void delete_character() {
 }
 
 void insert_utf8_character(const char *utf8_char, int char_len) {
-    if (Editor.curor_y == Editor.buffer_rows) {
+    if (Editor.cursor_y == Editor.buffer_rows) {
         append_row("", 0);
     }
-    Row *row = &Editor.row[Editor.curor_y];
+    Row *row = &Editor.row[Editor.cursor_y];
     if (Editor.cursor_x < 0) Editor.cursor_x = 0;
     if (Editor.cursor_x > row->size) Editor.cursor_x = row->size;
     if (!utf8_is_char_boundary(row->chars, Editor.cursor_x)) {
@@ -312,8 +312,8 @@ void insert_utf8_character(const char *utf8_char, int char_len) {
 }
 
 void yank_line() {
-    if (Editor.curor_y < 0 || Editor.curor_y >= Editor.buffer_rows) return;
-    Row *row = &Editor.row[Editor.curor_y];
+    if (Editor.cursor_y < 0 || Editor.cursor_y >= Editor.buffer_rows) return;
+    Row *row = &Editor.row[Editor.cursor_y];
     char header[] = "\x1b]52;c;";
     char trailer[] = "\x07";
     static const char b64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -343,18 +343,18 @@ void yank_line() {
 
 
 void delete_line() {
-    if (Editor.buffer_rows > 0 && Editor.curor_y >= 0 && Editor.curor_y < Editor.buffer_rows) {
-        Row *row = &Editor.row[Editor.curor_y];
+    if (Editor.buffer_rows > 0 && Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) {
+        Row *row = &Editor.row[Editor.cursor_y];
         char saved_line[512];
         int display_len = (row->size > 50) ? 50 : row->size;
         snprintf(saved_line, sizeof(saved_line), "%.*s%s", display_len, row->chars, (row->size > 50) ? "..." : "");
-        delete_row(Editor.curor_y);
+        delete_row(Editor.cursor_y);
         if (Editor.buffer_rows == 0) {
-            Editor.curor_y = 0;
-        } else if (Editor.curor_y >= Editor.buffer_rows) {
-            Editor.curor_y = Editor.buffer_rows - 1;
+            Editor.cursor_y = 0;
+        } else if (Editor.cursor_y >= Editor.buffer_rows) {
+            Editor.cursor_y = Editor.buffer_rows - 1;
         }
-        if (Editor.curor_y < 0) Editor.curor_y = 0;
+        if (Editor.cursor_y < 0) Editor.cursor_y = 0;
         Editor.cursor_x = 0;
         Editor.modified = 1;
         char msg[600];
@@ -386,11 +386,11 @@ void draw_content(buffer *ab) {
                 abappend(ab, "\x1b[38;5;244m", 11);
                 if (wrap_line == 0) {
                     if (Editor.mode == MODE_NORMAL) {
-                        if (filerow == Editor.curor_y) {
+                        if (filerow == Editor.cursor_y) {
                             abappend(ab, "\x1b[33m", 5);
                             line_num_len = snprintf(line_num_buf, sizeof(line_num_buf), "%*s ", Editor.gutter_width - 1, ">>");
                         } else {
-                            int rel_num = abs(filerow - Editor.curor_y);
+                            int rel_num = abs(filerow - Editor.cursor_y);
                             line_num_len = snprintf(line_num_buf, sizeof(line_num_buf), "%*d ", Editor.gutter_width - 1, rel_num);
                         }
                     } else {
@@ -409,7 +409,7 @@ void draw_content(buffer *ab) {
             if (Editor.file_tree) {
                 if (filerow < 3) {
                     abappend(ab, "\x1b[34m", 5);
-                } else if (filerow == Editor.curor_y) {
+                } else if (filerow == Editor.cursor_y) {
                     abappend(ab, "\x1b[7m", 4);
                 }
             }

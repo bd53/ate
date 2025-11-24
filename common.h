@@ -28,7 +28,7 @@ typedef struct buffer {
 } buffer;
 
 typedef struct Setup {
-    int cursor_x, curor_y;
+    int cursor_x, cursor_y;
     int row_offset;
     int buffer_rows;
     Row *row;
@@ -49,7 +49,7 @@ typedef struct Setup {
 #ifdef GLOBALS
 Setup Editor = {
     .cursor_x = 0,
-    .curor_y = 0,
+    .cursor_y = 0,
     .row_offset = 0,
     .buffer_rows = 0,
     .row = NULL,

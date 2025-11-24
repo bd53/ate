@@ -64,7 +64,7 @@ void open_help() {
             append_row("", 0);
         }
         Editor.cursor_x = 0;
-        Editor.curor_y = 0;
+        Editor.cursor_y = 0;
         Editor.row_offset = 0;
         Editor.help_view = 1;
         Editor.file_tree = 0;
@@ -73,11 +73,11 @@ void open_help() {
 }
 
 void scroll_editor() {
-    if (Editor.curor_y < Editor.row_offset) {
-        Editor.row_offset = Editor.curor_y;
+    if (Editor.cursor_y < Editor.row_offset) {
+        Editor.row_offset = Editor.cursor_y;
     }
-    if (Editor.curor_y >= Editor.row_offset + Editor.editor_rows) {
-        Editor.row_offset = Editor.curor_y - Editor.editor_rows + 1;
+    if (Editor.cursor_y >= Editor.row_offset + Editor.editor_rows) {
+        Editor.row_offset = Editor.cursor_y - Editor.editor_rows + 1;
     }
 }
 
@@ -165,7 +165,7 @@ void draw_status(buffer *ab) {
     else if (Editor.mode == MODE_INSERT) mode_str = "INSERT";
     else if (Editor.mode == MODE_COMMAND) mode_str = "COMMAND";
     else mode_str = "UNKNOWN";
-    int len = snprintf(status, sizeof(status), " %s | %s | R:%d L:%d", mode_str, filename_status, Editor.curor_y + 1, Editor.buffer_rows > 0 ? Editor.buffer_rows : 1);
+    int len = snprintf(status, sizeof(status), " %s | %s | R:%d L:%d", mode_str, filename_status, Editor.cursor_y + 1, Editor.buffer_rows > 0 ? Editor.buffer_rows : 1);
     if (len > Editor.editor_cols) len = Editor.editor_cols;
     abappend(ab, status, len);
     char rstatus[80];
@@ -189,13 +189,13 @@ void refresh_screen() {
     draw_status(&ab);
     int content_width = Editor.editor_cols - Editor.gutter_width;
     int screen_row = 0;
-    for (int filerow = Editor.row_offset; filerow < Editor.curor_y && filerow < Editor.buffer_rows; filerow++) {
+    for (int filerow = Editor.row_offset; filerow < Editor.cursor_y && filerow < Editor.buffer_rows; filerow++) {
         Row *row = &Editor.row[filerow];
         int wrapped_lines = (row->size + content_width - 1) / content_width;
         if (wrapped_lines == 0) wrapped_lines = 1;
         screen_row += wrapped_lines;
     }
-    if (Editor.curor_y >= 0 && Editor.curor_y < Editor.buffer_rows) {
+    if (Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) {
         int wrap_offset = Editor.cursor_x / content_width;
         screen_row += wrap_offset;
     }

@@ -205,10 +205,10 @@ void build_file_tree(const char *root_path) {
 }
 
 void open_file_tree() {
-    if (Editor.curor_y < 0 || Editor.curor_y >= Editor.buffer_rows) return;
-    Row *current_row = &Editor.row[Editor.curor_y];
+    if (Editor.cursor_y < 0 || Editor.cursor_y >= Editor.buffer_rows) return;
+    Row *current_row = &Editor.row[Editor.cursor_y];
     char *row_content = current_row->chars;
-    if (Editor.curor_y == 3 && current_row->size >= 2 && strncmp(row_content, "../", 3) == 0) {
+    if (Editor.cursor_y == 3 && current_row->size >= 2 && strncmp(row_content, "../", 3) == 0) {
         char cwd[1024];
         if (getcwd(cwd, sizeof(cwd))) {
             char parent_path[1024];
@@ -217,20 +217,20 @@ void open_file_tree() {
             if (parent && chdir(parent) == 0) {
                 build_file_tree(NULL);
                 Editor.cursor_x = 0;
-                Editor.curor_y = 0;
+                Editor.cursor_y = 0;
                 Editor.row_offset = 0;
             }
         }
         return;
     }
-    if (Editor.curor_y < 4) return;
-    int entry_index = Editor.curor_y - 4;
+    if (Editor.cursor_y < 4) return;
+    int entry_index = Editor.cursor_y - 4;
     if (entry_index < 0 || entry_index >= num_entries) return;
     if (file_is_dir[entry_index]) {
         if (chdir(file_paths[entry_index]) == 0) {
             build_file_tree(NULL);
             Editor.cursor_x = 0;
-            Editor.curor_y = 0;
+            Editor.cursor_y = 0;
             Editor.row_offset = 0;
         }
     } else {
@@ -241,7 +241,7 @@ void open_file_tree() {
             append_row("", 0);
         }
         Editor.cursor_x = 0;
-        Editor.curor_y = 0;
+        Editor.cursor_y = 0;
         Editor.row_offset = 0;
     }
 }
@@ -258,7 +258,7 @@ void toggle_file_tree() {
         Editor.file_tree = 1;
         build_file_tree(NULL);
         Editor.cursor_x = 0;
-        Editor.curor_y = 0;
+        Editor.cursor_y = 0;
         Editor.row_offset = 0;
     }
     refresh_screen();

@@ -168,7 +168,7 @@ void toggle_workspace_find() {
             open_editor(result_filepath);
         }
         if (result_row >= 0 && result_row < Editor.buffer_rows) {
-            Editor.curor_y = result_row;
+            Editor.cursor_y = result_row;
             Editor.cursor_x = result_col;
             Editor.found_row = result_row;
             Editor.found_col = result_col;
@@ -213,7 +213,7 @@ void workspace_find_next(int direction) {
         open_editor(result_filepath);
     }
     if (result_row >= 0 && result_row < Editor.buffer_rows) {
-        Editor.curor_y = result_row;
+        Editor.cursor_y = result_row;
         Editor.cursor_x = result_col;
         Editor.found_row = result_row;
         Editor.found_col = result_col;

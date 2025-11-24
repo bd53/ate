@@ -56,7 +56,7 @@ void open_file() {
         append_row("", 0);
     }
     Editor.cursor_x = 0;
-    Editor.curor_y = 0;
+    Editor.cursor_y = 0;
     Editor.row_offset = 0;
     refresh_screen();
 }
