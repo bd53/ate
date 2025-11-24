@@ -231,7 +231,7 @@ void open_file_tree() {
     } else {
         Editor.file_tree = 0;
         Editor.help_view = 0;
-        open_editor(file_paths[entry_index]);
+        display_editor(file_paths[entry_index]);
         if (Editor.buffer_rows == 0) append_row("", 0);
         Editor.cursor_x = 0;
         Editor.cursor_y = 0;

@@ -161,14 +161,15 @@ void toggle_workspace_find() {
             save_file();
         }
         if (Editor.filename == NULL || strcmp(Editor.filename, result_filepath) != 0) {
-            open_editor(result_filepath);
+            display_editor(result_filepath);
         }
         if (result_row >= 0 && result_row < Editor.buffer_rows) {
             Editor.cursor_y = result_row;
             Editor.cursor_x = result_col;
             Editor.found_row = result_row;
             Editor.found_col = result_col;
-            scroll_editor();
+            if (Editor.cursor_y < Editor.row_offset) Editor.row_offset = Editor.cursor_y;
+            if (Editor.cursor_y >= Editor.row_offset + Editor.editor_rows) Editor.row_offset = Editor.cursor_y - Editor.editor_rows + 1;
         }
         char msg[512];
         const char *display_path = result_filepath;
@@ -203,13 +204,14 @@ void workspace_find_next(int direction) {
     int result_row = rows[index];
     int result_col = cols[index];
     if (Editor.modified && Editor.filename) save_file();
-    if (Editor.filename == NULL || strcmp(Editor.filename, result_filepath) != 0) open_editor(result_filepath);
+    if (Editor.filename == NULL || strcmp(Editor.filename, result_filepath) != 0) display_editor(result_filepath);
     if (result_row >= 0 && result_row < Editor.buffer_rows) {
         Editor.cursor_y = result_row;
         Editor.cursor_x = result_col;
         Editor.found_row = result_row;
         Editor.found_col = result_col;
-        scroll_editor();
+        if (Editor.cursor_y < Editor.row_offset) Editor.row_offset = Editor.cursor_y;
+        if (Editor.cursor_y >= Editor.row_offset + Editor.editor_rows) Editor.row_offset = Editor.cursor_y - Editor.editor_rows + 1;
     }
     char msg[512];
     const char *display_path = result_filepath;

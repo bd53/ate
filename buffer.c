@@ -448,7 +448,7 @@ void execute_command(char *cmd) {
         save_file();
     }
     else if (strcmp(cmd, "help") == 0) {
-        open_help();
+        display_help();
     }
     else if (strcmp(cmd, "checkhealth") == 0) {
         check_health();
@@ -470,12 +470,13 @@ void command_mode() {
     buf[0] = '\0';
     int prompt_row = Editor.editor_rows + 2;
     while(1) {
-        scroll_editor();
+        if (Editor.cursor_y < Editor.row_offset) Editor.row_offset = Editor.cursor_y;
+        if (Editor.cursor_y >= Editor.row_offset + Editor.editor_rows) Editor.row_offset = Editor.cursor_y - Editor.editor_rows + 1;
         struct Buffer ab = BUFFER_INIT;
         append(&ab, "\x1b[?25l", 6);
         append(&ab, "\x1b[H", 3);
         draw_content(&ab);
-        draw_status(&ab);
+        display_status(&ab);
         char pos_buf[32];
         snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;1H", prompt_row);
         append(&ab, pos_buf, strlen(pos_buf));
@@ -526,4 +527,39 @@ void command_mode() {
             }
         }
     }
+}
+
+void refresh_screen() {
+    if (Editor.cursor_y < Editor.row_offset) Editor.row_offset = Editor.cursor_y;
+    if (Editor.cursor_y >= Editor.row_offset + Editor.editor_rows) Editor.row_offset = Editor.cursor_y - Editor.editor_rows + 1;
+    struct Buffer ab = BUFFER_INIT;
+    append(&ab, "\x1b[?25l", 6);
+    append(&ab, "\x1b[H", 3);
+    draw_content(&ab);
+    display_status(&ab);
+    int content_width = Editor.editor_cols - Editor.gutter_width;
+    int screen_row = 0;
+    for (int filerow = Editor.row_offset; filerow < Editor.cursor_y && filerow < Editor.buffer_rows; filerow++) {
+        struct Row *row = &Editor.row[filerow];
+        int wrapped_lines = (row->size + content_width - 1) / content_width;
+        if (wrapped_lines == 0) wrapped_lines = 1;
+        screen_row += wrapped_lines;
+    }
+    if (Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) {
+        int wrap_offset = Editor.cursor_x / content_width;
+        screen_row += wrap_offset;
+    }
+    int cur_x = (Editor.cursor_x % content_width) + Editor.gutter_width + 1;
+    int cur_y = screen_row + 1;
+    char buf[32];
+    snprintf(buf, sizeof(buf), "\x1b[%d;%dH", cur_y, cur_x);
+    append(&ab, buf, strlen(buf));
+    if (Editor.mode == 1) {
+        append(&ab, "\x1b[5 q", 5);
+    } else {
+        append(&ab, "\x1b[2 q", 5);
+    }
+    append(&ab, "\x1b[?25h", 6);
+    if (write(STDOUT_FILENO, ab.b, ab.length) == -1) die("write");
+    free(ab.b);
 }

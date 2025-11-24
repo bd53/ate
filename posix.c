@@ -4,7 +4,7 @@
 #include "efunc.h"
 #include "util.h"
 
-static void ttclose(void) {
+void ttclose() {
     ttopen(false);
 }
 

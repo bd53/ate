@@ -177,7 +177,7 @@ static void handle_help(int c) {
             command_mode();
             return;
         case KEY_TOGGLE_HELP:
-            open_help();
+            display_help();
             return;
         case KEY_TOGGLE_FILE_TREE:
             toggle_file_tree();
@@ -211,7 +211,7 @@ static void handle_normal_mode(int c) {
             command_mode();
             return;
         case KEY_TOGGLE_HELP:
-            open_help();
+            display_help();
             return;
         case KEY_TOGGLE_FILE_TREE:
             toggle_file_tree();
@@ -231,7 +231,7 @@ static void handle_normal_mode(int c) {
         case KEY_FIND_PREV:
             workspace_find_next(-1);
             return;
-        case KEY_INSERT_MODE_ENTER:
+        case KEY_INSERT_MODE:
             Editor.mode = 1;
             break;
         case KEY_YANK_LINE:
@@ -315,7 +315,7 @@ void process_keypress() {
             if (Editor.mode == 1) {
                 delete_line();
             } else if (Editor.mode == 0) {
-                open_help();
+                display_help();
             }
             break;
         case KEY_CTRL_BACKSPACE:

@@ -7,7 +7,7 @@
 #include "efunc.h"
 #include "util.h"
 
-int open_editor(char *filename) {
+int display_editor(char *filename) {
     if (filename == NULL) return -1;
     char *new_filename = strdup(filename);
     if (new_filename == NULL) die("strdup");
@@ -46,7 +46,7 @@ int open_editor(char *filename) {
     return 0;
 }
 
-void open_help() {
+void display_help() {
     if (Editor.help_view) {
         run_cleanup();
         Editor.help_view = 0;
@@ -54,7 +54,7 @@ void open_help() {
         if (Editor.buffer_rows == 0) append_row("", 0);
     } else {
         run_cleanup();
-        open_editor("help.txt");
+        display_editor("help.txt");
         if (Editor.buffer_rows == 0) append_row("", 0);
         Editor.cursor_x = 0;
         Editor.cursor_y = 0;
@@ -65,12 +65,7 @@ void open_help() {
     refresh_screen();
 }
 
-void scroll_editor() {
-    if (Editor.cursor_y < Editor.row_offset) Editor.row_offset = Editor.cursor_y;
-    if (Editor.cursor_y >= Editor.row_offset + Editor.editor_rows) Editor.row_offset = Editor.cursor_y - Editor.editor_rows + 1;
-}
-
-void draw_status(struct Buffer *ab) {
+void display_status(struct Buffer *ab) {
     if (ab == NULL) return;
     append(ab, "\x1b[7m", 4);
     char status[80];
@@ -98,40 +93,6 @@ void draw_status(struct Buffer *ab) {
     append(ab, rstatus, rlen);
     append(ab, "\x1b[m", 3);
     append(ab, "\r\n", 2);
-}
-
-void refresh_screen() {
-    scroll_editor();
-    struct Buffer ab = BUFFER_INIT;
-    append(&ab, "\x1b[?25l", 6);
-    append(&ab, "\x1b[H", 3);
-    draw_content(&ab);
-    draw_status(&ab);
-    int content_width = Editor.editor_cols - Editor.gutter_width;
-    int screen_row = 0;
-    for (int filerow = Editor.row_offset; filerow < Editor.cursor_y && filerow < Editor.buffer_rows; filerow++) {
-        struct Row *row = &Editor.row[filerow];
-        int wrapped_lines = (row->size + content_width - 1) / content_width;
-        if (wrapped_lines == 0) wrapped_lines = 1;
-        screen_row += wrapped_lines;
-    }
-    if (Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) {
-        int wrap_offset = Editor.cursor_x / content_width;
-        screen_row += wrap_offset;
-    }
-    int cur_x = (Editor.cursor_x % content_width) + Editor.gutter_width + 1;
-    int cur_y = screen_row + 1;
-    char buf[32];
-    snprintf(buf, sizeof(buf), "\x1b[%d;%dH", cur_y, cur_x);
-    append(&ab, buf, strlen(buf));
-    if (Editor.mode == 1) {
-        append(&ab, "\x1b[5 q", 5);
-    } else {
-        append(&ab, "\x1b[2 q", 5);
-    }
-    append(&ab, "\x1b[?25h", 6);
-    if (write(STDOUT_FILENO, ab.b, ab.length) == -1) die("write");
-    free(ab.b);
 }
 
 void display_message(int type, const char *message) {

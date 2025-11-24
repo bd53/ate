@@ -42,7 +42,7 @@ void open_file() {
     if (Editor.file_tree) free_file_entries();
     Editor.file_tree = 0;
     Editor.help_view = 0;
-    open_editor(filename);
+    display_editor(filename);
     free(filename);
     if (Editor.buffer_rows == 0) append_row("", 0);
     Editor.cursor_x = 0;

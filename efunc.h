@@ -22,15 +22,13 @@ void delete_line();
 void draw_content(struct Buffer *ab);
 void command_mode();
 void execute_command(char *cmd);
+void refresh_screen();
 
 /* display.c */
-int open_editor(char *filename);
-void open_help();
-void scroll_editor();
-void draw_status(struct Buffer *ab);
-void refresh_screen();
+int display_editor(char *filename);
+void display_help();
+void display_status(struct Buffer *ab);
 void display_message(int type, const char *message);
-void ttopen(bool enable);
 
 /* eval.c */
 void check_health();
@@ -41,6 +39,10 @@ void open_file();
 
 /* input.c */
 char *prompt(const char *prompt);
+
+/* posix.c */
+void ttclose();
+void ttopen(bool enable);
 
 /* search.c */
 void toggle_workspace_find();
