@@ -2,6 +2,7 @@
 #define EDEF_H
 
 #define BUFFER_INIT {NULL, 0}
+#define ESC_SEQ_LEN 9
 
 // for those who want to use 8
 // tabs you can have a blast!
