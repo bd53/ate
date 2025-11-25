@@ -418,7 +418,7 @@ void refresh_screen(void) {
         cur_x = (Editor.cursor_x % content_width) + Editor.gutter_width + 1;
         cur_y = screen_row + 1;
     }
-    char buf[32];
+    char buf[64];
     snprintf(buf, sizeof(buf), "\x1b[%d;%dH%s\x1b[?25h", cur_y, cur_x, Editor.mode == 1 ? "\x1b[5 q" : "\x1b[2 q");
     append(&ab, buf, strlen(buf));
     if (write(STDOUT_FILENO, ab.b, ab.length) == -1) die("write");
