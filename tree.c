@@ -17,7 +17,7 @@ static int *file_depth = NULL;
 static int num_entries = 0;
 static int entries_capacity = 0;
 
-void free_file_entries() {
+void free_file_entries(void) {
     for (int i = 0; i < num_entries; i++) {
         free(file_names[i]);
         file_names[i] = NULL;
@@ -199,7 +199,7 @@ void build_file_tree(const char *root_path) {
     }
 }
 
-void open_file_tree() {
+void open_file_tree(void) {
     if (Editor.cursor_y < 0 || Editor.cursor_y >= Editor.buffer_rows) return;
     struct Row *current_row = &Editor.row[Editor.cursor_y];
     char *row_content = current_row->chars;
@@ -229,8 +229,9 @@ void open_file_tree() {
             Editor.row_offset = 0;
         }
     } else {
-        Editor.file_tree = 0;
         Editor.help_view = 0;
+        Editor.file_tree = 0;
+        Editor.tag_view = 0;
         display_editor(file_paths[entry_index]);
         if (Editor.buffer_rows == 0) append_row("", 0);
         Editor.cursor_x = 0;
@@ -239,10 +240,12 @@ void open_file_tree() {
     }
 }
 
-void toggle_file_tree() {
+void toggle_file_tree(void) {
     if (Editor.file_tree) {
         run_cleanup();
+        Editor.help_view = 0;
         Editor.file_tree = 0;
+        Editor.tag_view = 0;
         if (Editor.buffer_rows == 0) append_row("", 0);
     } else {
         run_cleanup();

@@ -10,7 +10,7 @@
 #include "utf8.h"
 #include "util.h"
 
-static int read_esc_sequence() {
+static int read_esc_sequence(void) {
     char seq[5];
     if (read(STDIN_FILENO, &seq[0], 1) != 1) return KEY_ESCAPE;
     if (read(STDIN_FILENO, &seq[1], 1) != 1) return KEY_ESCAPE;
@@ -44,7 +44,7 @@ static int read_esc_sequence() {
     return KEY_ESCAPE;
 }
 
-int input_read_key() {
+int input_read_key(void) {
     int nread;
     char c;
     while ((nread = read(STDIN_FILENO, &c, 1)) != 1) if (nread == -1 && errno != EAGAIN) die("read");
@@ -116,7 +116,7 @@ static int translate_key(int key) {
     }
 }
 
-static void handle_quit() {
+static void handle_quit(void) {
     write(STDOUT_FILENO, "\x1b[2J", 4);
     write(STDOUT_FILENO, "\x1b[H", 3);
     free_workspace_search();
@@ -206,15 +206,12 @@ static void handle_normal_mode(int c) {
     switch (c) {
         case KEY_ENTER:
             break;
+        case KEY_INSERT_MODE:
+            Editor.mode = 1;
+            break;
         case KEY_COMMAND_MODE:
             Editor.mode = 2;
             command_mode();
-            return;
-        case KEY_TOGGLE_HELP:
-            display_help();
-            return;
-        case KEY_TOGGLE_FILE_TREE:
-            toggle_file_tree();
             return;
         case KEY_OPEN_FILE:
             open_file();
@@ -222,8 +219,17 @@ static void handle_normal_mode(int c) {
         case KEY_SAVE_FILE:
             save_file();
             return;
+        case KEY_TOGGLE_HELP:
+            display_help();
+            return;
         case KEY_TOGGLE_FIND:
             toggle_workspace_find();
+            return;
+        case KEY_TOGGLE_TAGS:
+             display_tags();
+             return;
+        case KEY_TOGGLE_FILE_TREE:
+            toggle_file_tree();
             return;
         case KEY_FIND_NEXT:
             workspace_find_next(1);
@@ -231,9 +237,6 @@ static void handle_normal_mode(int c) {
         case KEY_FIND_PREV:
             workspace_find_next(-1);
             return;
-        case KEY_INSERT_MODE:
-            Editor.mode = 1;
-            break;
         case KEY_YANK_LINE:
             yank_line();
             break;
@@ -297,7 +300,7 @@ static void handle_insert_mode(int c) {
     }
 }
 
-void process_keypress() {
+void process_keypress(void) {
     int c = input_read_key();
     if (Editor.file_tree) {
         handle_file_tree(c);
@@ -310,6 +313,9 @@ void process_keypress() {
     switch (c) {
         case KEY_QUIT:
             handle_quit();
+            break;
+        case KEY_TOGGLE_TAGS:
+            if (Editor.mode == 0) display_tags();
             break;
         case KEY_TOGGLE_FILE_TREE:
             if (Editor.mode == 0) toggle_file_tree();

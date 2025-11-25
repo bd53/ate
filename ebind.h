@@ -32,6 +32,7 @@ enum Codes {
 #define KEY_SAVE_FILE CTRL_KEY('s')
 #define KEY_TOGGLE_HELP CTRL_KEY('h')
 #define KEY_TOGGLE_FIND CTRL_KEY('f')
+#define KEY_TOGGLE_TAGS CTRL_KEY('y')
 #define KEY_TOGGLE_FILE_TREE CTRL_KEY('p')
 #define KEY_FIND_NEXT 'n'
 #define KEY_FIND_PREV 'b'

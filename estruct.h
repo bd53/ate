@@ -34,6 +34,7 @@ struct Setup {
     int modified;
     int help_view;
     int file_tree;
+    int tag_view;
 };
 
 #ifdef GLOBALS
@@ -54,7 +55,8 @@ struct Setup Editor = {
     .filename = NULL,
     .modified = 0,
     .help_view = 0,
-    .file_tree = 0
+    .file_tree = 0,
+    .tag_view = 0
 };
 #else
 extern struct Setup Editor;

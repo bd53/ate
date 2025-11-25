@@ -22,6 +22,7 @@ int display_editor(char *filename) {
         Editor.filename = new_filename;
         Editor.help_view = 0;
         Editor.file_tree = 0;
+        Editor.tag_view = 0;
         append_row("", 0);
         return -1;
     }
@@ -34,6 +35,7 @@ int display_editor(char *filename) {
     Editor.filename = new_filename;
     Editor.help_view = 0;
     Editor.file_tree = 0;
+    Editor.tag_view = 0;
     char *line = NULL;
     size_t linecap = 0;
     ssize_t linelen;
@@ -46,23 +48,44 @@ int display_editor(char *filename) {
     return 0;
 }
 
-void display_help() {
+void display_help(void) {
     if (Editor.help_view) {
         run_cleanup();
         Editor.help_view = 0;
-        Editor.file_tree = 0;
         if (Editor.buffer_rows == 0) append_row("", 0);
     } else {
         run_cleanup();
         display_editor("help.txt");
         if (Editor.buffer_rows == 0) append_row("", 0);
-        Editor.cursor_x = 0;
-        Editor.cursor_y = 0;
-        Editor.row_offset = 0;
         Editor.help_view = 1;
-        Editor.file_tree = 0;
     }
     refresh_screen();
+}
+
+void display_tags(void) {
+    if (Editor.tag_view) {
+        run_cleanup();
+        Editor.tag_view = 0;
+        if (Editor.buffer_rows == 0) append_row("", 0);
+    } else {
+        FILE *fp = fopen("tags", "r");
+        if (!fp) {
+            display_message(2, "No tags file found.");
+            return;
+        }
+        run_cleanup();
+        Editor.tag_view = 1;
+        char *line = NULL;
+        size_t linecap = 0;
+        ssize_t linelen;
+        while ((linelen = getline(&line, &linecap, fp)) != -1) {
+            while (linelen > 0 && (line[linelen - 1] == '\n' || line[linelen - 1] == '\r')) linelen--;
+            append_row(line, linelen);
+        }
+        free(line);
+        fclose(fp);
+        if (Editor.buffer_rows == 0) append_row("Tags file is empty", 18);
+    }
 }
 
 void display_status(struct Buffer *ab) {
