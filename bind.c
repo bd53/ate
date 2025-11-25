@@ -45,56 +45,55 @@ static int read_esc_sequence(void) {
     fds.fd = STDIN_FILENO;
     fds.events = POLLIN;
     int poll_result = poll(&fds, 1, 10);
-    if (poll_result == 0) return KEY_ESCAPE;
-    if (poll_result == -1) return KEY_ESCAPE;
+    if (poll_result == 0) return (int) KEY_ESCAPE;
+    if (poll_result == -1) return (int) KEY_ESCAPE;
     char seq[5];
-    if (read(STDIN_FILENO, &seq[0], 1) != 1) return KEY_ESCAPE;
-    if (seq[0] != '[') return KEY_ESCAPE;
-    if (read(STDIN_FILENO, &seq[1], 1) != 1) return KEY_ESCAPE;
+    if (read(STDIN_FILENO, &seq[0], 1) != 1) return (int) KEY_ESCAPE;
+    if (seq[0] != '[') return (int) KEY_ESCAPE;
+    if (read(STDIN_FILENO, &seq[1], 1) != 1) return (int) KEY_ESCAPE;
     if (seq[1] == '1') {
         if (read(STDIN_FILENO, &seq[2], 1) == 1 && seq[2] == ';' && read(STDIN_FILENO, &seq[3], 1) == 1 && seq[3] == '5' && read(STDIN_FILENO, &seq[4], 1) == 1) {
             switch (seq[4]) {
-                case 'A': return KEY_CTRL_ARROW_UP;
-                case 'B': return KEY_CTRL_ARROW_DOWN;
-                case 'C': return KEY_CTRL_ARROW_RIGHT;
-                case 'D': return KEY_CTRL_ARROW_LEFT;
+                case 'A': return (int) KEY_CTRL_ARROW_UP;
+                case 'B': return (int) KEY_CTRL_ARROW_DOWN;
+                case 'C': return (int) KEY_CTRL_ARROW_RIGHT;
+                case 'D': return (int) KEY_CTRL_ARROW_LEFT;
             }
         }
     }
     switch (seq[1]) {
-        case 'A': return KEY_ARROW_UP;
-        case 'B': return KEY_ARROW_DOWN;
-        case 'C': return KEY_ARROW_RIGHT;
-        case 'D': return KEY_ARROW_LEFT;
+        case 'A': return (int) KEY_ARROW_UP;
+        case 'B': return (int) KEY_ARROW_DOWN;
+        case 'C': return (int) KEY_ARROW_RIGHT;
+        case 'D': return (int) KEY_ARROW_LEFT;
         case '3':
             if (read(STDIN_FILENO, &seq[2], 1) == 1 && seq[2] == ';') {
-                if (read(STDIN_FILENO, &seq[3], 1) == 1 && seq[3] == '5' &&
-                    read(STDIN_FILENO, &seq[4], 1) == 1 && seq[4] == '~') {
-                    return KEY_CTRL_BACKSPACE;
+                if (read(STDIN_FILENO, &seq[3], 1) == 1 && seq[3] == '5' && read(STDIN_FILENO, &seq[4], 1) == 1 && seq[4] == '~') {
+                    return (int) KEY_CTRL_BACKSPACE;
                 }
             }
             break;
     }
-    return KEY_ESCAPE;
+    return (int) KEY_ESCAPE;
 }
 
 int input_read_key(void) {
-    int nread;
+    ssize_t nread;
     char c;
     while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
         if (nread == -1 && errno != EAGAIN) die("read");
     }
-    if ((unsigned char)c == CSI) {
+    if ((unsigned char)c == (unsigned char)0x9B) {
         return read_csi_sequence();
     }
     if (c == KEY_ESCAPE) {
         return read_esc_sequence();
     }
-    return c;
+    return (int)c;
 }
 
 static void cursor_move(int key) {
-    struct Row *row = (Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) ? &Editor.row[Editor.cursor_y] : NULL;
+    struct Row *row = (Editor.row != NULL && Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) ? &Editor.row[Editor.cursor_y] : NULL;
     Editor.found_row = -1;
     Editor.found_col = -1;
     switch (key) {
@@ -103,13 +102,13 @@ static void cursor_move(int key) {
                 Editor.cursor_x--;
             } else if (Editor.cursor_y > 0) {
                 Editor.cursor_y--;
-                if (Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) Editor.cursor_x = Editor.row[Editor.cursor_y].size;
+                if (Editor.row != NULL && Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) Editor.cursor_x = Editor.row[Editor.cursor_y].size;
             }
             break;
         case KEY_ARROW_RIGHT:
-            if (row && Editor.cursor_x < row->size) {
+            if (row != NULL && Editor.cursor_x < row->size) {
                 Editor.cursor_x++;
-            } else if (row && Editor.cursor_x == row->size && Editor.cursor_y < Editor.buffer_rows - 1) {
+            } else if (row != NULL && Editor.cursor_x == row->size && Editor.cursor_y < Editor.buffer_rows - 1) {
                 Editor.cursor_y++;
                 Editor.cursor_x = 0;
             }
@@ -124,7 +123,7 @@ static void cursor_move(int key) {
             Editor.cursor_x = 0;
             break;
         case KEY_CTRL_ARROW_RIGHT:
-            if (row) Editor.cursor_x = row->size;
+            if (row != NULL) Editor.cursor_x = row->size;
             break;
         case KEY_CTRL_ARROW_UP:
         case KEY_CTRL_ARROW_DOWN: {
@@ -135,11 +134,10 @@ static void cursor_move(int key) {
             break;
         }
     }
-    row = (Editor.buffer_rows > 0 && Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) ? &Editor.row[Editor.cursor_y] : NULL;
-    int len = row ? row->size : 0;
+    row = (Editor.row != NULL && Editor.buffer_rows > 0 && Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) ? &Editor.row[Editor.cursor_y] : NULL;
+    int len = row != NULL ? row->size : 0;
     if (Editor.cursor_x > len) Editor.cursor_x = len;
 }
-
 
 static int translate_key(int key) {
     switch (key) {
@@ -152,8 +150,8 @@ static int translate_key(int key) {
 }
 
 static void handle_quit(void) {
-    write(STDOUT_FILENO, "\x1b[2J", 4);
-    write(STDOUT_FILENO, "\x1b[H", 3);
+    (void)write(STDOUT_FILENO, "\x1b[2J", 4);
+    (void)write(STDOUT_FILENO, "\x1b[H", 3);
     free_workspace_search();
     run_cleanup();
     exit(0);
@@ -310,8 +308,8 @@ static void handle_insert_mode(int c) {
         default:
             if (c >= 32 && c < 127) {
                 Editor.modified = 1;
-                insert_character(c);
-                if (c == '}' || c == ')' || c == ']') auto_dedent();
+                insert_character((char)c);
+                if (c == (int)'}' || c == (int)')' || c == (int)']') auto_dedent();
             }
             break;
     }
@@ -319,11 +317,11 @@ static void handle_insert_mode(int c) {
 
 void process_keypress(void) {
     int c = input_read_key();
-    if (Editor.file_tree) {
+    if (Editor.file_tree != 0) {
         handle_file_tree(c);
         return;
     }
-    if (Editor.help_view) {
+    if (Editor.help_view != 0) {
         handle_help(c);
         return;
     }

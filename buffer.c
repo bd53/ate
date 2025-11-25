@@ -162,13 +162,15 @@ void delete_character(void) {
     if (Editor.cursor_x == 0 && Editor.cursor_y == 0) return;
     if (Editor.cursor_y >= Editor.buffer_rows) return;
     if (Editor.cursor_x == 0) {
-        struct Row *row = &Editor.row[--Editor.cursor_y];
-        struct Row *next = &Editor.row[Editor.cursor_y + 1];
-        int merge_at = row->size;
-        resize_row(row, row->size + next->size);
-        memcpy(&row->chars[merge_at], next->chars, next->size);
-        memcpy(&row->state[merge_at], next->state, next->size);
-        row->size = merge_at + next->size;
+        if (Editor.cursor_y == 0) return;
+        struct Row *prev_row = &Editor.row[Editor.cursor_y - 1];
+        struct Row *current_row = &Editor.row[Editor.cursor_y];
+        int merge_at = prev_row->size;
+        resize_row(prev_row, prev_row->size + current_row->size);
+        memcpy(&prev_row->chars[merge_at], current_row->chars, current_row->size);
+        memcpy(&prev_row->state[merge_at], current_row->state, current_row->size);
+        prev_row->size = merge_at + current_row->size;
+        Editor.cursor_y--;
         Editor.cursor_x = merge_at;
         delete_row(Editor.cursor_y + 1);
     } else {
@@ -218,10 +220,19 @@ void goto_line(void) {
         refresh_screen();
         return;
     }
+    char *trimmed = command;
+    while (isspace((unsigned char)*trimmed)) trimmed++;
+    char *end = trimmed + strlen(trimmed) - 1;
+    while (end > trimmed && isspace((unsigned char)*end)) {
+        *end = '\0';
+        end--;
+    }
     char *endptr;
-    long line_number = strtol(command, &endptr, 10);
+    long line_number = strtol(trimmed, &endptr, 10);
+    while (*endptr && isspace((unsigned char)*endptr)) endptr++;
+    int valid = (*endptr == '\0' && line_number > 0 && line_number <= Editor.buffer_rows);
     free(command);
-    if (*endptr == '\0' && line_number > 0 && line_number <= Editor.buffer_rows) {
+    if (valid) {
         Editor.cursor_y = (int)line_number - 1;
         Editor.cursor_x = 0;
         if (Editor.cursor_y < Editor.row_offset) Editor.row_offset = Editor.cursor_y;
@@ -406,16 +417,31 @@ void refresh_screen(void) {
     append(&ab, "\x1b[?25l\x1b[H", 9);
     draw_content(&ab);
     display_status(&ab);
+    Editor.gutter_width = calc_gutter_width();
     int content_width = Editor.editor_cols - Editor.gutter_width;
+    if (Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) {
+        struct Row *row = &Editor.row[Editor.cursor_y];
+        if (Editor.cursor_x > row->size) Editor.cursor_x = row->size;
+        if (Editor.cursor_x < 0) Editor.cursor_x = 0;
+    } else {
+        Editor.cursor_x = 0;
+        Editor.cursor_y = 0;
+    }
     int screen_row = 0;
     for (int filerow = Editor.row_offset; filerow < Editor.cursor_y && filerow < Editor.buffer_rows; filerow++) {
         int wrapped = (Editor.row[filerow].size + content_width - 1) / content_width;
-        screen_row += wrapped ? wrapped : 1;
+        screen_row += wrapped > 0 ? wrapped : 1;
     }
     int cur_x = 1, cur_y = screen_row + 1;
     if (Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) {
-        screen_row += Editor.cursor_x / content_width;
-        cur_x = (Editor.cursor_x % content_width) + Editor.gutter_width + 1;
+        int wrap_index = Editor.cursor_x / content_width;
+        screen_row += wrap_index;
+        int col_in_wrap = Editor.cursor_x % content_width;
+        if (wrap_index == 0) {
+            cur_x = col_in_wrap + Editor.gutter_width + 1;
+        } else {
+            cur_x = col_in_wrap + 1;
+        }
         cur_y = screen_row + 1;
     }
     char buf[64];
