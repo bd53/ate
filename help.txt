@@ -7,6 +7,7 @@ Close this window:   Use ":q<Enter>".
    Get out of ate:   Use "ctrl+q" or ":quit<enter>" (careful, all changes are lost!)
 
 Jump to a subject:   Type CTRL+ARROWKEYS. Repeat to go where you want.
+     Jump to line:   Use CTRL+G in current buffer.
 
     Deleting text:   Delete the characters under the cursor with "d" until the
                      end of the line.
@@ -27,5 +28,7 @@ ATE COMMANDS
 :checkhealth         Run editor health check
 :w or :write         Save file (if file doesn't exist yet, you'll be prompted to save it as one)
 :Ex and :bd          Toggle default file tree
+:find                Search for text through all buffers
+:tags                Display ctags (must be generated via "make tags")
 :q                   Closes current buffer
 :quit                Quit editor
