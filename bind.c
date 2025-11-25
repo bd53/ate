@@ -93,7 +93,7 @@ int input_read_key(void) {
     return c;
 }
 
-void cursor_move(int key) {
+static void cursor_move(int key) {
     struct Row *row = (Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) ? &Editor.row[Editor.cursor_y] : NULL;
     Editor.found_row = -1;
     Editor.found_col = -1;

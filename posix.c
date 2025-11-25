@@ -14,7 +14,7 @@ static const char *exit_sequences[] = {
     "\x1b[>4l" // csi
 };
 
-void ttclose(void) {
+static void ttclose(void) {
     ttopen(false);
 }
 

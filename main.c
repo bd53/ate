@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
     }
     ttopen(true);
     if (argc >= 2) display_editor(argv[1]);
-    if (get_window_size(&Editor.editor_rows, &Editor.editor_cols) == -1) die("get_window_size");
+    if (fetch(&Editor.editor_rows, &Editor.editor_cols) == -1) die("fetch");
     Editor.editor_rows -= 2;
     if (Editor.buffer_rows == 0) append_row("", 0);
     while (1) {

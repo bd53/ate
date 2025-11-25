@@ -167,7 +167,7 @@ static void scan_directory(const char *path, int depth) {
     free(temp_depth);
 }
 
-void build_file_tree(const char *root_path) {
+static void build_file_tree(const char *root_path) {
     free_rows();
     free_file_entries();
     char cwd[1024];
