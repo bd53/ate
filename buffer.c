@@ -6,7 +6,6 @@
 
 #include "ebind.h"
 #include "efunc.h"
-#include "utf8.h"
 #include "util.h"
 
 void free_rows(void) {
@@ -91,7 +90,6 @@ void insert_character(char c) {
     struct Row *row = &Editor.row[Editor.cursor_y];
     if (Editor.cursor_x < 0) Editor.cursor_x = 0;
     if (Editor.cursor_x > row->size) Editor.cursor_x = row->size;
-    if (!utf8_is_char_boundary(row->chars, Editor.cursor_x)) Editor.cursor_x = utf8_prev_char_boundary(row->chars, Editor.cursor_x);
     char *new_chars = realloc(row->chars, row->size + 2);
     if (!new_chars) die("realloc");
     row->chars = new_chars;
@@ -149,9 +147,6 @@ void insert_new_line(void) {
         int split_at = Editor.cursor_x;
         if (split_at < 0) split_at = 0;
         if (split_at > row->size) split_at = row->size;
-        if (!utf8_is_char_boundary(row->chars, split_at)) {
-            split_at = utf8_prev_char_boundary(row->chars, split_at);
-        }
         second_half_len = row->size - split_at;
         second_half = malloc(second_half_len + 1);
         if (!second_half) die("malloc");
@@ -223,7 +218,8 @@ void delete_character(void) {
         Editor.cursor_y--;
         struct Row *row = &Editor.row[Editor.cursor_y];
         struct Row *next_row = &Editor.row[Editor.cursor_y + 1];
-        Editor.cursor_x = row->size;
+        int merge_start_x = row->size;
+        Editor.cursor_x = merge_start_x;
         char *new_chars = realloc(row->chars, row->size + next_row->size + 1);
         if (!new_chars) die("realloc");
         row->chars = new_chars;
@@ -233,21 +229,20 @@ void delete_character(void) {
         unsigned char *new_hl = realloc(row->state, row->size > 0 ? row->size : 1);
         if (!new_hl) die("realloc");
         row->state = new_hl;
-        memcpy(&row->state[Editor.cursor_x], next_row->state, next_row->size);
+        memcpy(&row->state[merge_start_x], next_row->state, next_row->size);
         delete_row(Editor.cursor_y + 1);
         Editor.modified = 1;
-    } else {
+    }
+    else {
         struct Row *row = &Editor.row[Editor.cursor_y];
-        int prev_pos = utf8_prev_char_boundary(row->chars, Editor.cursor_x);
-        int char_len = Editor.cursor_x - prev_pos;
-        memmove(&row->chars[prev_pos], &row->chars[Editor.cursor_x], row->size - Editor.cursor_x + 1);
-        row->size -= char_len;
-        memmove(&row->state[prev_pos], &row->state[Editor.cursor_x], row->size - prev_pos);
+        memmove(&row->chars[Editor.cursor_x - 1], &row->chars[Editor.cursor_x], row->size - Editor.cursor_x + 1);
+        row->size--;
+        memmove(&row->state[Editor.cursor_x - 1], &row->state[Editor.cursor_x], row->size - Editor.cursor_x + 1);
         int new_hl_size = row->size > 0 ? row->size : 1;
         unsigned char *new_hl = realloc(row->state, new_hl_size);
         if (!new_hl) die("realloc");
         row->state = new_hl;
-        Editor.cursor_x = prev_pos;
+        Editor.cursor_x--;
         Editor.modified = 1;
     }
 }
@@ -559,11 +554,12 @@ void refresh_screen(void) {
         if (wrapped_lines == 0) wrapped_lines = 1;
         screen_row += wrapped_lines;
     }
+    int cur_x = 1;
     if (Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) {
         int wrap_offset = Editor.cursor_x / content_width;
         screen_row += wrap_offset;
+        cur_x = (Editor.cursor_x % content_width) + Editor.gutter_width + 1;
     }
-    int cur_x = (Editor.cursor_x % content_width) + Editor.gutter_width + 1;
     int cur_y = screen_row + 1;
     char buf[32];
     snprintf(buf, sizeof(buf), "\x1b[%d;%dH", cur_y, cur_x);

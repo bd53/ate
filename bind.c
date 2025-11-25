@@ -8,7 +8,6 @@
 
 #include "ebind.h"
 #include "efunc.h"
-#include "utf8.h"
 #include "util.h"
 
 static int read_csi_sequence(void) {
@@ -34,10 +33,7 @@ static int read_csi_sequence(void) {
         case 'D': return KEY_ARROW_LEFT;
         case '3':
             if (read(STDIN_FILENO, &seq[1], 1) == 1 && seq[1] == ';') {
-                if (read(STDIN_FILENO, &seq[2], 1) == 1 && seq[2] == '5' &&
-                    read(STDIN_FILENO, &seq[3], 1) == 1 && seq[3] == '~') {
-                    return KEY_CTRL_BACKSPACE;
-                }
+                if (read(STDIN_FILENO, &seq[2], 1) == 1 && seq[2] == '5' && read(STDIN_FILENO, &seq[3], 1) == 1 && seq[3] == '~') return KEY_CTRL_BACKSPACE;
             }
             break;
     }
@@ -56,9 +52,7 @@ static int read_esc_sequence(void) {
     if (seq[0] != '[') return KEY_ESCAPE;
     if (read(STDIN_FILENO, &seq[1], 1) != 1) return KEY_ESCAPE;
     if (seq[1] == '1') {
-        if (read(STDIN_FILENO, &seq[2], 1) == 1 && seq[2] == ';' &&
-            read(STDIN_FILENO, &seq[3], 1) == 1 && seq[3] == '5' &&
-            read(STDIN_FILENO, &seq[4], 1) == 1) {
+        if (read(STDIN_FILENO, &seq[2], 1) == 1 && seq[2] == ';' && read(STDIN_FILENO, &seq[3], 1) == 1 && seq[3] == '5' && read(STDIN_FILENO, &seq[4], 1) == 1) {
             switch (seq[4]) {
                 case 'A': return KEY_CTRL_ARROW_UP;
                 case 'B': return KEY_CTRL_ARROW_DOWN;
@@ -106,11 +100,7 @@ void cursor_move(int key) {
     switch (key) {
         case KEY_ARROW_LEFT:
             if (Editor.cursor_x > 0) {
-                if (row) {
-                    Editor.cursor_x = utf8_prev_char_boundary(row->chars, Editor.cursor_x);
-                } else {
-                    Editor.cursor_x--;
-                }
+                Editor.cursor_x--;
             } else if (Editor.cursor_y > 0) {
                 Editor.cursor_y--;
                 if (Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) Editor.cursor_x = Editor.row[Editor.cursor_y].size;
@@ -118,7 +108,7 @@ void cursor_move(int key) {
             break;
         case KEY_ARROW_RIGHT:
             if (row && Editor.cursor_x < row->size) {
-                Editor.cursor_x = utf8_next_char_boundary(row->chars, Editor.cursor_x, row->size);
+                Editor.cursor_x++;
             } else if (row && Editor.cursor_x == row->size && Editor.cursor_y < Editor.buffer_rows - 1) {
                 Editor.cursor_y++;
                 Editor.cursor_x = 0;
@@ -148,7 +138,6 @@ void cursor_move(int key) {
     row = (Editor.buffer_rows > 0 && Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) ? &Editor.row[Editor.cursor_y] : NULL;
     int len = row ? row->size : 0;
     if (Editor.cursor_x > len) Editor.cursor_x = len;
-    if (row && Editor.cursor_x > 0 && Editor.cursor_x < row->size) if (!utf8_is_char_boundary(row->chars, Editor.cursor_x)) Editor.cursor_x = utf8_prev_char_boundary(row->chars, Editor.cursor_x);
 }
 
 
@@ -322,25 +311,7 @@ static void handle_insert_mode(int c) {
             if (c >= 32 && c < 127) {
                 Editor.modified = 1;
                 insert_character(c);
-                if (c == '}' || c == ')' || c == ']') {
-                    auto_dedent();
-                }
-            } else if (c >= 128) {
-                char utf8_buf[5];
-                utf8_buf[0] = (char)c;
-                int char_len = 1;
-                unsigned char uc = (unsigned char)c;
-                if ((uc & 0xE0) == 0xC0) char_len = 2;
-                else if ((uc & 0xF0) == 0xE0) char_len = 3;
-                else if ((uc & 0xF8) == 0xF0) char_len = 4;
-                for (int i = 1; i < char_len; i++) {
-                    int next_byte = input_read_key();
-                    if (next_byte < 0x80 || next_byte > 0xBF) return;
-                    utf8_buf[i] = (char)next_byte;
-                }
-                utf8_buf[char_len] = '\0';
-                Editor.modified = 1;
-                insert_utf8_character(utf8_buf, char_len);
+                if (c == '}' || c == ')' || c == ']') auto_dedent();
             }
             break;
     }
@@ -379,10 +350,7 @@ void process_keypress(void) {
         case KEY_ESCAPE:
             if (Editor.mode == 1) {
                 Editor.mode = 0;
-                if (Editor.cursor_x > 0 && Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) {
-                    struct Row *row = &Editor.row[Editor.cursor_y];
-                    Editor.cursor_x = utf8_prev_char_boundary(row->chars, Editor.cursor_x);
-                }
+                if (Editor.cursor_x > 0) Editor.cursor_x--;
             } else if (Editor.mode == 2) {
                 Editor.mode = 0;
             }
