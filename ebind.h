@@ -1,6 +1,7 @@
 #ifndef EBIND_H
 #define EBIND_H
 
+#define CSI 0x9B
 #define CTRL_KEY(k) ((k) & 0x1f)
 
 enum Codes {

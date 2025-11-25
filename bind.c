@@ -4,18 +4,61 @@
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
+#include <poll.h>
 
 #include "ebind.h"
 #include "efunc.h"
 #include "utf8.h"
 #include "util.h"
 
+static int read_csi_sequence(void) {
+    char seq[5];
+    if (read(STDIN_FILENO, &seq[0], 1) != 1) return CSI;
+    if (seq[0] == '1') {
+        if (read(STDIN_FILENO, &seq[1], 1) == 1 && seq[1] == ';' &&
+            read(STDIN_FILENO, &seq[2], 1) == 1 && seq[2] == '5' &&
+            read(STDIN_FILENO, &seq[3], 1) == 1) {
+            switch (seq[3]) {
+                case 'A': return KEY_CTRL_ARROW_UP;
+                case 'B': return KEY_CTRL_ARROW_DOWN;
+                case 'C': return KEY_CTRL_ARROW_RIGHT;
+                case 'D': return KEY_CTRL_ARROW_LEFT;
+            }
+        }
+        return CSI;
+    }
+    switch (seq[0]) {
+        case 'A': return KEY_ARROW_UP;
+        case 'B': return KEY_ARROW_DOWN;
+        case 'C': return KEY_ARROW_RIGHT;
+        case 'D': return KEY_ARROW_LEFT;
+        case '3':
+            if (read(STDIN_FILENO, &seq[1], 1) == 1 && seq[1] == ';') {
+                if (read(STDIN_FILENO, &seq[2], 1) == 1 && seq[2] == '5' &&
+                    read(STDIN_FILENO, &seq[3], 1) == 1 && seq[3] == '~') {
+                    return KEY_CTRL_BACKSPACE;
+                }
+            }
+            break;
+    }
+    return CSI;
+}
+
 static int read_esc_sequence(void) {
+    struct pollfd fds;
+    fds.fd = STDIN_FILENO;
+    fds.events = POLLIN;
+    int poll_result = poll(&fds, 1, 10);
+    if (poll_result == 0) return KEY_ESCAPE;
+    if (poll_result == -1) return KEY_ESCAPE;
     char seq[5];
     if (read(STDIN_FILENO, &seq[0], 1) != 1) return KEY_ESCAPE;
+    if (seq[0] != '[') return KEY_ESCAPE;
     if (read(STDIN_FILENO, &seq[1], 1) != 1) return KEY_ESCAPE;
-    if (seq[0] == '[' && seq[1] == '1') {
-        if (read(STDIN_FILENO, &seq[2], 1) == 1 && seq[2] == ';' && read(STDIN_FILENO, &seq[3], 1) == 1 && seq[3] == '5' && read(STDIN_FILENO, &seq[4], 1) == 1) {
+    if (seq[1] == '1') {
+        if (read(STDIN_FILENO, &seq[2], 1) == 1 && seq[2] == ';' &&
+            read(STDIN_FILENO, &seq[3], 1) == 1 && seq[3] == '5' &&
+            read(STDIN_FILENO, &seq[4], 1) == 1) {
             switch (seq[4]) {
                 case 'A': return KEY_CTRL_ARROW_UP;
                 case 'B': return KEY_CTRL_ARROW_DOWN;
@@ -24,22 +67,19 @@ static int read_esc_sequence(void) {
             }
         }
     }
-    if (seq[0] == '[') {
-        switch (seq[1]) {
-            case 'A': return KEY_ARROW_UP;
-            case 'B': return KEY_ARROW_DOWN;
-            case 'C': return KEY_ARROW_RIGHT;
-            case 'D': return KEY_ARROW_LEFT;
-            case '3':
-                if (read(STDIN_FILENO, &seq[2], 1) == 1) {
-                    if (seq[2] == ';') {
-                        if (read(STDIN_FILENO, &seq[3], 1) == 1 && seq[3] == '5' && read(STDIN_FILENO, &seq[4], 1) == 1 && seq[4] == '~') {
-                            return KEY_CTRL_BACKSPACE;
-                        }
-                    }
+    switch (seq[1]) {
+        case 'A': return KEY_ARROW_UP;
+        case 'B': return KEY_ARROW_DOWN;
+        case 'C': return KEY_ARROW_RIGHT;
+        case 'D': return KEY_ARROW_LEFT;
+        case '3':
+            if (read(STDIN_FILENO, &seq[2], 1) == 1 && seq[2] == ';') {
+                if (read(STDIN_FILENO, &seq[3], 1) == 1 && seq[3] == '5' &&
+                    read(STDIN_FILENO, &seq[4], 1) == 1 && seq[4] == '~') {
+                    return KEY_CTRL_BACKSPACE;
                 }
-                break;
-        }
+            }
+            break;
     }
     return KEY_ESCAPE;
 }
@@ -47,8 +87,16 @@ static int read_esc_sequence(void) {
 int input_read_key(void) {
     int nread;
     char c;
-    while ((nread = read(STDIN_FILENO, &c, 1)) != 1) if (nread == -1 && errno != EAGAIN) die("read");
-    return (c == KEY_ESCAPE) ? read_esc_sequence() : c;
+    while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
+        if (nread == -1 && errno != EAGAIN) die("read");
+    }
+    if ((unsigned char)c == CSI) {
+        return read_csi_sequence();
+    }
+    if (c == KEY_ESCAPE) {
+        return read_esc_sequence();
+    }
+    return c;
 }
 
 void cursor_move(int key) {
@@ -100,9 +148,7 @@ void cursor_move(int key) {
     row = (Editor.buffer_rows > 0 && Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) ? &Editor.row[Editor.cursor_y] : NULL;
     int len = row ? row->size : 0;
     if (Editor.cursor_x > len) Editor.cursor_x = len;
-    if (row && Editor.cursor_x > 0 && Editor.cursor_x < row->size) {
-        if (!utf8_is_char_boundary(row->chars, Editor.cursor_x)) Editor.cursor_x = utf8_prev_char_boundary(row->chars, Editor.cursor_x);
-    }
+    if (row && Editor.cursor_x > 0 && Editor.cursor_x < row->size) if (!utf8_is_char_boundary(row->chars, Editor.cursor_x)) Editor.cursor_x = utf8_prev_char_boundary(row->chars, Editor.cursor_x);
 }
 
 
