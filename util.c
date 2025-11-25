@@ -9,7 +9,7 @@
 #include "ebind.h"
 #include "util.h"
 
-void run_cleanup() {
+void run_cleanup(void) {
     if (Editor.query) {
         free(Editor.query);
         Editor.query = NULL;

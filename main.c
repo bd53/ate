@@ -10,7 +10,7 @@
 #include "util.h"
 #include "version.h"
 
-static void usage() {
+static void usage(void) {
     printf("%s --version | output version information\n", PROGRAM_NAME);
     printf("%s --help    | display this help or view more information in the editor using :help\n", PROGRAM_NAME);
     exit(0);

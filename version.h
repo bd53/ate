@@ -6,6 +6,6 @@
 
 #define VERSION "4.0.15"
 
-void version();
+void version(void);
 
 #endif

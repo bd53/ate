@@ -67,7 +67,7 @@ static int check_command(const char *cmd, char *output_buf, size_t buf_size, con
     return 1;
 }
 
-static void check_core_utils() {
+static void check_core_utils(void) {
     char version[256];
     append_row("==============================================================================", 78);
     append_section_header("Core Utility");
@@ -91,7 +91,7 @@ static void check_core_utils() {
     }
 }
 
-static void check_language_support() {
+static void check_language_support(void) {
     char version[256];
     append_row("", 0);
     append_row("==============================================================================", 78);
@@ -125,7 +125,7 @@ static void check_language_support() {
     }
 }
 
-static void check_os_info() {
+static void check_os_info(void) {
     struct utsname sys_info;
     char line[256];
     append_row("", 0);
@@ -145,7 +145,7 @@ static void check_os_info() {
     }
 }
 
-static void check_external_tools() {
+static void check_external_tools(void) {
     char version[256];
     char path[512];
     char command[512];
@@ -190,7 +190,7 @@ static void check_external_tools() {
     }
 }
 
-static void check_clipboard() {
+static void check_clipboard(void) {
     const char *clipboard_tools[] = {"xclip", "xsel", "wl-copy", "pbcopy"};
     int found = 0;
     append_row("", 0);
@@ -209,7 +209,7 @@ static void check_clipboard() {
     }
 }
 
-void check_health() {
+void check_health(void) {
     run_cleanup();
     check_core_utils();
     check_language_support();

@@ -114,7 +114,7 @@ static void collect_and_search_files(const char *dirpath, const char *query, int
     closedir(dir);
 }
 
-void free_workspace_search() {
+void free_workspace_search(void) {
     if (filepaths) {
         for (int i = 0; i < num_results; i++) {
             free(filepaths[i]);
@@ -178,7 +178,7 @@ static void jump_to_result(int index) {
     display_message(1, msg);
 }
 
-void toggle_workspace_find() {
+void toggle_workspace_find(void) {
     free_workspace_search();
     char *query = prompt("Find in workspace: %s (ESC to cancel)");
     if (query == NULL) {

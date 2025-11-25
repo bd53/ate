@@ -12,7 +12,7 @@ static const char *exit_sequences[] = {
     "\x1b[?1003l" // absolute mouse reporting
 };
 
-void ttclose() {
+void ttclose(void) {
     ttopen(false);
 }
 

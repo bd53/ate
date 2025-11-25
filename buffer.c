@@ -9,7 +9,7 @@
 #include "utf8.h"
 #include "util.h"
 
-void free_rows() {
+void free_rows(void) {
     for (int j = 0; j < Editor.buffer_rows; j++) {
         free(Editor.row[j].chars);
         free(Editor.row[j].state);
@@ -131,7 +131,7 @@ static int closing_bracket(const char *line, int len) {
     return 0;
 }
 
-void insert_new_line() {
+void insert_new_line(void) {
     int indent_spaces = 0;
     int add_extra_indent = 0;
     char *second_half = NULL;
@@ -197,7 +197,7 @@ void insert_new_line() {
     }
 }
 
-void auto_dedent() {
+void auto_dedent(void) {
     if (Editor.cursor_y < 0 || Editor.cursor_y >= Editor.buffer_rows) return;
     struct Row *row = &Editor.row[Editor.cursor_y];
     int only_whitespace = 1;
@@ -215,7 +215,7 @@ void auto_dedent() {
     }
 }
 
-void delete_character() {
+void delete_character(void) {
     if (Editor.cursor_x == 0 && Editor.cursor_y == 0) return;
     if (Editor.cursor_y >= Editor.buffer_rows) return;
     if (Editor.cursor_x == 0) {
@@ -252,7 +252,7 @@ void delete_character() {
     }
 }
 
-void yank_line() {
+void yank_line(void) {
     if (Editor.cursor_y < 0 || Editor.cursor_y >= Editor.buffer_rows) return;
     struct Row *row = &Editor.row[Editor.cursor_y];
     char header[] = "\x1b]52;c;";
@@ -279,7 +279,7 @@ void yank_line() {
     display_message(1, "Yanked");
 }
 
-void delete_line() {
+void delete_line(void) {
     if (Editor.buffer_rows > 0 && Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) {
         delete_row(Editor.cursor_y);
         if (Editor.buffer_rows == 0) {
@@ -294,7 +294,7 @@ void delete_line() {
     }
 }
 
-void goto_line() {
+void goto_line(void) {
     char *command = prompt("Go to line: ");
     if (command == NULL) {
         Editor.mode = 0;
@@ -464,6 +464,9 @@ void execute_command(char *cmd) {
     else if (strcmp(cmd, "find") == 0) {
         toggle_workspace_find();
     }
+    else if (strcmp(cmd, "tags") == 0) {
+        display_tags();
+    }
     else {
         char error_msg[256];
         snprintf(error_msg, sizeof(error_msg), "E182: Not an editor command: '%s'", cmd);
@@ -473,7 +476,7 @@ void execute_command(char *cmd) {
     }
 }
 
-void command_mode() {
+void command_mode(void) {
     size_t bufsize = 256;
     char *buf = malloc(bufsize);
     if (!buf) die("malloc");
@@ -540,7 +543,7 @@ void command_mode() {
     }
 }
 
-void refresh_screen() {
+void refresh_screen(void) {
     if (Editor.cursor_y < Editor.row_offset) Editor.row_offset = Editor.cursor_y;
     if (Editor.cursor_y >= Editor.row_offset + Editor.editor_rows) Editor.row_offset = Editor.cursor_y - Editor.editor_rows + 1;
     struct Buffer ab = BUFFER_INIT;

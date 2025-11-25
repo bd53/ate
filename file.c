@@ -6,7 +6,7 @@
 #include "efunc.h"
 #include "util.h"
 
-void save_file() {
+void save_file(void) {
     if (Editor.filename == NULL) {
         char *filename = prompt("Save as: %s (ESC to cancel)");
         if (filename == NULL) {
@@ -33,7 +33,7 @@ void save_file() {
     refresh_screen();
 }
 
-void open_file() {
+void open_file(void) {
     char *filename = prompt("Open file: %s (ESC to cancel)");
     if (!filename) {
         refresh_screen();
