@@ -1,4 +1,4 @@
-# makefile for ate, updated Tue Nov 25 12:11:48 PM EST 2025
+# makefile for ate, updated Wed Nov 26 06:32:29 AM EST 2025
 
 PROGRAM=ate
 
@@ -30,7 +30,7 @@ sparse:
 
 clean:
 	@echo "  CLEAN"
-	rm -f $(PROGRAM) lintout tags Makefile.bak *.o
+	rm -f $(PROGRAM) lintout tags Makefile.bak *.o *~
 
 install: $(PROGRAM)
 	cp $(PROGRAM) ${BINDIR}/
@@ -46,6 +46,9 @@ lint: $(SRC)
 tags: $(SRC)
 	rm -f tags
 	ctags $(SRC)
+
+format:
+	@indent -kr -i8 -ts8 -sob -l80 -lc80 -nut $(SRC) $(HDR)
 
 source:
 	@mv Makefile Makefile.bak

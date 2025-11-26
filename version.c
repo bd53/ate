@@ -2,6 +2,7 @@
 
 #include "version.h"
 
-void version(void) {
-    printf("%s version %s\n", PROGRAM_NAME_LONG, VERSION);
+void version(void)
+{
+        printf("%s version %s\n", PROGRAM_NAME_LONG, VERSION);
 }

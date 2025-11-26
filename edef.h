@@ -3,8 +3,6 @@
 
 #define BUFFER_INIT {NULL, 0}
 
-// for those who want to use 8
-// tabs you can have a blast!
-#define INDENT_SIZE 4
+#define INDENT_SIZE 8
 
 #endif

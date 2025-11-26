@@ -3,7 +3,8 @@
 
 typedef unsigned int unicode_t;
 
-unsigned utf8_to_unicode(const char *line, unsigned index, unsigned len, unicode_t *res);
+unsigned utf8_to_unicode(const char *line, unsigned index, unsigned len,
+                         unicode_t * res);
 unsigned unicode_to_utf8(unsigned int c, char *utf8);
 int utf8_char_len(const char *s, int max_len);
 int utf8_decode(const char *s, int max_len, int *codepoint);
