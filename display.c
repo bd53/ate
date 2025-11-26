@@ -7,35 +7,33 @@
 #include "efunc.h"
 #include "util.h"
 
-int display_editor(char *filename) {
-    if (filename == NULL) return -1;
-    char *new_filename = strdup(filename);
-    if (new_filename == NULL) die("strdup");
-    FILE *fp = fopen(filename, "r");
-    if (!fp) {
-        free_rows();
-        free_file_entries();
-        if (Editor.query) {
-            free(Editor.query);
-            Editor.query = NULL;
-        }
-        Editor.filename = new_filename;
-        Editor.help_view = 0;
-        Editor.file_tree = 0;
-        Editor.tag_view = 0;
-        append_row("", 0);
-        return -1;
-    }
+static void reset_editor_state(char *filename) {
     free_rows();
     free_file_entries();
     if (Editor.query) {
         free(Editor.query);
         Editor.query = NULL;
     }
-    Editor.filename = new_filename;
+    if (Editor.filename) {
+        free(Editor.filename);
+    }
+    Editor.filename = filename;
     Editor.help_view = 0;
     Editor.file_tree = 0;
     Editor.tag_view = 0;
+}
+
+int display_editor(char *filename) {
+    if (filename == NULL) return -1;
+    char *new_filename = strdup(filename);
+    if (new_filename == NULL) die("strdup");
+    FILE *fp = fopen(filename, "r");
+    if (!fp) {
+        reset_editor_state(new_filename);
+        append_row("", 0);
+        return -1;
+    }
+    reset_editor_state(new_filename);
     char *line = NULL;
     size_t linecap = 0;
     ssize_t linelen;
@@ -87,7 +85,7 @@ void display_status(struct Buffer *ab) {
     const char *filetype_name = "[No Name]";
     if (Editor.filename) {
         char *dot = strrchr(Editor.filename, '.');
-        if (dot && *(dot + 1) != '\0') {
+        if (dot != NULL && dot[1] != '\0') {
             filetype_name = dot + 1;
         }
     }
