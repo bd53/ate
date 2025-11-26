@@ -480,11 +480,7 @@ void refresh_screen(void) {
         int wrap_index = Editor.cursor_x / content_width;
         screen_row += wrap_index;
         int col_in_wrap = Editor.cursor_x % content_width;
-        if (wrap_index == 0) {
-            cur_x = col_in_wrap + Editor.gutter_width + 1;
-        } else {
-            cur_x = col_in_wrap + 1;
-        }
+        cur_x = col_in_wrap + Editor.gutter_width + 1;
         cur_y = screen_row + 1;
     }
     char buf[64];
