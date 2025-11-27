@@ -24,14 +24,56 @@ void refresh_screen()
                 printf(" ");
         }
         printf("\x1b[m\r\n");
-        for (int i = 0; i < rows; i++) {
-                int line_idx = i + editor.offset_y;
-                if (line_idx < editor.line_numbers) {
-                        printf("%s", editor.lines[line_idx]);
-                } else {
-                        printf("~");
+        int cursor_screen_row = -1;
+        int cursor_screen_col = 0;
+        int current_screen_row = 0;
+        for (int i = editor.offset_y;
+             i < editor.line_numbers && current_screen_row < rows; i++) {
+                char *line = editor.lines[i];
+                int len = strlen(line);
+                int col = 0;
+                int line_row_offset = 0;
+                int is_cursor_line = (i == editor.cursor_y);
+                int cursor_found = 0;
+                for (int j = 0; j < len; j++) {
+                        char c = line[j];
+                        int char_width = char_display_width(c, col);
+                        if (col + char_width > cols) {
+                                printf("\x1b[K\r\n");
+                                line_row_offset++;
+                                current_screen_row++;
+                                col = 0;
+                                if (current_screen_row >= rows) {
+                                        break;
+                                }
+                        }
+                        if (is_cursor_line && j == editor.cursor_x
+                            && !cursor_found) {
+                                cursor_screen_row = current_screen_row;
+                                cursor_screen_col = col;
+                                cursor_found = 1;
+                        }
+                        if (c == '\t') {
+                                int tab_width = TAB_SIZE - (col % TAB_SIZE);
+                                for (int k = 0; k < tab_width; k++) {
+                                        printf(" ");
+                                }
+                                col += tab_width;
+                        } else {
+                                printf("%c", c);
+                                col++;
+                        }
+                }
+                if (is_cursor_line && editor.cursor_x >= len && !cursor_found) {
+                        cursor_screen_row = current_screen_row;
+                        cursor_screen_col = col;
                 }
                 printf("\x1b[K\r\n");
+                current_screen_row++;
+        }
+        while (current_screen_row < rows) {
+                printf("~\x1b[K\r\n");
+                current_screen_row++;
         }
         printf("\x1b[7m");
         char bottom_status[2048];
@@ -55,7 +97,9 @@ void refresh_screen()
                 printf(" ");
         }
         printf("\x1b[m");
-        printf("\x1b[%d;%dH", editor.cursor_y - editor.offset_y + 2, editor.cursor_x + 1);
+        if (cursor_screen_row >= 0) {
+                printf("\x1b[%d;%dH", cursor_screen_row + 2, cursor_screen_col + 1);
+        }
         fflush(stdout);
 }
 
