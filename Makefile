@@ -1,12 +1,12 @@
-# makefile for ate, updated Wed Nov 26 06:32:29 AM EST 2025
+# makefile for ate, updated Thu Nov 27 02:24:51 AM EST 2025
 
 PROGRAM=ate
 
-SRC=bind.c buffer.c display.c eval.c file.c input.c main.c posix.c search.c tree.c utf8.c util.c version.c
+SRC=bind.c buffer.c file.c globals.c main.c posix.c search.c tree.c util.c version.c
 
-OBJ=bind.o buffer.o display.o eval.o file.o input.o main.o posix.o search.o tree.o utf8.o util.o version.o
+OBJ=bind.o buffer.o file.o globals.o main.o posix.o search.o tree.o util.o version.o
 
-HDR=ebind.h edef.h efunc.h estruct.h utf8.h util.h version.h
+HDR=ebind.h edef.h efunc.h estruct.h util.h version.h
 
 # DO NOT ADD OR MODIFY ANY LINES ABOVE THIS -- make source creates them
 
@@ -16,7 +16,6 @@ CFLAGS=-O2 $(WARNINGS) -g
 DEFINES=-DAUTOCONF -DPOSIX -DUSG -D_XOPEN_SOURCE=600 -D_GNU_SOURCE
 LIBS=-lcurses
 BINDIR=/usr/local/bin
-LIBDIR=/usr/local/lib
 
 $(PROGRAM): $(OBJ)
 	@echo "  LINK    " $@
@@ -34,9 +33,7 @@ clean:
 
 install: $(PROGRAM)
 	cp $(PROGRAM) ${BINDIR}/
-	cp help.txt ${LIBDIR}/help.txt
 	chmod 755 ${BINDIR}/$(PROGRAM)
-	chmod 644 ${LIBDIR}/help.txt
 
 lint: $(SRC)
 	@rm -f lintout

@@ -1,274 +1,262 @@
+#include <ctype.h>
 #include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <unistd.h>
 
+#include "edef.h"
 #include "efunc.h"
+#include "estruct.h"
 #include "util.h"
 
-static char **filepaths = NULL;
-static int *rows = NULL;
-static int *cols = NULL;
-static char **line_contents = NULL;
-
-static int num_results = 0;
-static int current_index = -1;
-static int capacity = 0;
-
-static void add_search_result(const char *filepath, int row, int col,
-                              const char *line_content)
+void init_search(void)
 {
-        if (num_results >= capacity) {
-                int new_capacity = capacity == 0 ? 64 : capacity * 2;
-                char **new_filepaths =
-                    realloc(filepaths, sizeof(char *) * new_capacity);
-                int *new_rows = realloc(rows, sizeof(int) * new_capacity);
-                int *new_cols = realloc(cols, sizeof(int) * new_capacity);
-                char **new_line_contents =
-                    realloc(line_contents, sizeof(char *) * new_capacity);
-                if (!new_filepaths || !new_rows || !new_cols
-                    || !new_line_contents) {
-                        if (new_filepaths && new_filepaths != filepaths)
-                                free(new_filepaths);
-                        if (new_rows && new_rows != rows)
-                                free(new_rows);
-                        if (new_cols && new_cols != cols)
-                                free(new_cols);
-                        if (new_line_contents
-                            && new_line_contents != line_contents)
-                                free(new_line_contents);
-                        return;
-                }
-                filepaths = new_filepaths;
-                rows = new_rows;
-                cols = new_cols;
-                line_contents = new_line_contents;
-                capacity = new_capacity;
-        }
-        char *fp_copy = strdup(filepath);
-        char *lc_copy = strdup(line_content);
-        if (!fp_copy || !lc_copy) {
-                free(fp_copy);
-                free(lc_copy);
-                return;
-        }
-        filepaths[num_results] = fp_copy;
-        rows[num_results] = row;
-        cols[num_results] = col;
-        line_contents[num_results] = lc_copy;
-        num_results++;
+        memset(&search_state, 0, sizeof(struct SearchState));
+        search_state.selected_index = 0;
+        search_state.scroll_offset = 0;
+        search_state.query[0] = '\0';
+        search_state.query_len = 0;
 }
 
-static void collect_and_search_files(const char *dirpath, const char *query,
-                                     int depth)
+void free_search(void)
 {
-        if (depth > 10)
+        for (int i = 0; i < search_state.result_count; i++) {
+                free(search_state.results[i].filepath);
+                free(search_state.results[i].line_content);
+        }
+        search_state.result_count = 0;
+}
+
+int fuzzy_match(const char *pattern, const char *str)
+{
+        if (!pattern || !str)
+                return 0;
+        if (strlen(pattern) == 0)
+                return 1;
+        const char *p = pattern;
+        const char *s = str;
+        int score = 0;
+        int consecutive = 0;
+        while (*p && *s) {
+                if (tolower(*p) == tolower(*s)) {
+                        score += 1 + consecutive * 5;
+                        consecutive++;
+                        p++;
+                } else {
+                        consecutive = 0;
+                }
+                s++;
+        }
+        return (*p == '\0') ? score : 0;
+}
+
+static void search_file(const char *filepath, const char *query)
+{
+        FILE *fp = fopen(filepath, "r");
+        if (!fp)
                 return;
-        if (dirpath == NULL || query == NULL)
+        char *line = NULL;
+        size_t len = 0;
+        ssize_t read;
+        int line_num = 0;
+        while ((read = getline(&line, &len, fp)) != -1 && search_state.result_count < MAX_SEARCH_RESULTS) {
+                line_num++;
+                if (read > 0 && line[read - 1] == '\n') {
+                        line[read - 1] = '\0';
+                        read--;
+                }
+                int score = fuzzy_match(query, line);
+                if (score > 0) {
+                        struct SearchResult *result = &search_state.results[search_state.result_count];
+                        result->filepath = strdup(filepath);
+                        result->line_number = line_num;
+                        result->line_content = strdup(line);
+                        result->score = score;
+                        search_state.result_count++;
+                }
+        }
+        free(line);
+        fclose(fp);
+}
+
+static void search_directory_recursive(const char *dirpath, const char *query, int depth)
+{
+        if (depth > 5)
+                return;
+        if (search_state.result_count >= MAX_SEARCH_RESULTS)
                 return;
         DIR *dir = opendir(dirpath);
         if (!dir)
                 return;
         struct dirent *entry;
         while ((entry = readdir(dir)) != NULL) {
-                if (strcmp(entry->d_name, ".") == 0
-                    || strcmp(entry->d_name, "..") == 0)
+                if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
                         continue;
                 if (entry->d_name[0] == '.')
                         continue;
-                char full_path[2048];
-                size_t dirpath_len = strlen(dirpath);
-                size_t name_len = strlen(entry->d_name);
-                if (dirpath_len + name_len + 2 >= sizeof(full_path))
-                        continue;
-                int n = snprintf(full_path, sizeof(full_path), "%s/%s", dirpath,
-                                 entry->d_name);
-                if (n < 0 || n >= (int) sizeof(full_path))
-                        continue;
+                char fullpath[1024];
+                snprintf(fullpath, sizeof(fullpath), "%s/%s", dirpath, entry->d_name);
                 struct stat st;
-                if (stat(full_path, &st) == -1)
+                if (stat(fullpath, &st) == -1)
                         continue;
                 if (S_ISDIR(st.st_mode)) {
-                        collect_and_search_files(full_path, query, depth + 1);
+                        if (strcmp(entry->d_name, ".git") == 0 ||
+                                strcmp(entry->d_name, ".o") == 0)
+                                continue;
+                        search_directory_recursive(fullpath, query, depth + 1);
                 } else if (S_ISREG(st.st_mode)) {
-                        FILE *fp = fopen(full_path, "rb");
-                        if (!fp)
-                                continue;
-                        unsigned char buffer[512];
-                        size_t bytes_read =
-                            fread(buffer, 1, sizeof(buffer), fp);
-                        fclose(fp);
-                        int is_binary = 0;
-                        for (size_t i = 0; i < bytes_read; i++) {
-                                if (buffer[i] == 0) {
-                                        is_binary = 1;
-                                        break;
-                                }
+                        const char *ext = strrchr(entry->d_name, '.');
+                        if (ext && (strcmp(ext, ".c") == 0 ||
+                                    strcmp(ext, ".h") == 0 ||
+                                    strcmp(ext, ".txt") == 0 ||
+                                    strcmp(ext, ".md") == 0 ||
+                                    strcmp(ext, ".py") == 0)) {
+                                search_file(fullpath, query);
                         }
-                        if (is_binary)
-                                continue;
-                        fp = fopen(full_path, "r");
-                        if (!fp)
-                                continue;
-                        char *line = NULL;
-                        size_t linecap = 0;
-                        ssize_t linelen;
-                        int row_num = 0;
-                        while ((linelen = getline(&line, &linecap, fp)) != -1) {
-                                if (linelen > 0 && line[linelen - 1] == '\n') {
-                                        line[linelen - 1] = '\0';
-                                        linelen--;
-                                }
-                                if (linelen > 0 && line[linelen - 1] == '\r') {
-                                        line[linelen - 1] = '\0';
-                                        linelen--;
-                                }
-                                char *pos = line;
-                                while ((pos = strstr(pos, query)) != NULL) {
-                                        int col = (int) (pos - line);
-                                        add_search_result(full_path, row_num,
-                                                          col, line);
-                                        pos++;
-                                }
-                                row_num++;
-                        }
-                        free(line);
-                        fclose(fp);
                 }
         }
         closedir(dir);
 }
 
-void free_workspace_search(void)
+static int compare_results(const void *a, const void *b)
 {
-        if (filepaths) {
-                for (int i = 0; i < num_results; i++) {
-                        free(filepaths[i]);
-                        free(line_contents[i]);
-                }
-                free(filepaths);
-                free(rows);
-                free(cols);
-                free(line_contents);
-        }
-        filepaths = NULL;
-        rows = NULL;
-        cols = NULL;
-        line_contents = NULL;
-        num_results = 0;
-        current_index = -1;
-        capacity = 0;
+        const struct SearchResult *ra = (const struct SearchResult *) a;
+        const struct SearchResult *rb = (const struct SearchResult *) b;
+        return rb->score - ra->score;
 }
 
-static void jump_to_result(int index)
+void search_directory(const char *query)
 {
-        if (index < 0 || index >= num_results)
-                return;
-        char *result_filepath = filepaths[index];
-        int result_row = rows[index];
-        int result_col = cols[index];
-        if (Editor.modified && Editor.filename)
-                save_file();
-        if (Editor.filename == NULL
-            || strcmp(Editor.filename, result_filepath) != 0)
-                display_editor(result_filepath);
-        if (result_row >= 0 && result_row < Editor.buffer_rows) {
-                Editor.cursor_y = result_row;
-                Editor.cursor_x = result_col;
-                Editor.found_row = result_row;
-                Editor.found_col = result_col;
-                int content_width = Editor.editor_cols - Editor.gutter_width;
-                if (content_width <= 0)
-                        content_width = 80;     // fallback
-                if (Editor.cursor_y < Editor.row_offset)
-                        Editor.row_offset = Editor.cursor_y;
-                if (Editor.cursor_y >= Editor.row_offset + Editor.editor_rows)
-                        Editor.row_offset =
-                            Editor.cursor_y - Editor.editor_rows + 1;
-                int wrap_line = Editor.cursor_x / content_width;
-                int screen_rows_before = 0;
-                for (int i = Editor.row_offset;
-                     i < Editor.cursor_y && i < Editor.buffer_rows; i++) {
-                        struct Row *row = &Editor.row[i];
-                        int wrapped_lines =
-                            (row->size + content_width - 1) / content_width;
-                        if (wrapped_lines == 0)
-                                wrapped_lines = 1;
-                        screen_rows_before += wrapped_lines;
-                }
-                int total_screen_row = screen_rows_before + wrap_line;
-                if (total_screen_row >= Editor.editor_rows) {
-                        int target_offset =
-                            Editor.cursor_y - Editor.editor_rows / 2;
-                        if (target_offset < 0)
-                                target_offset = 0;
-                        Editor.row_offset = target_offset;
-                }
-        }
-        char msg[512];
-        const char *display_path = result_filepath;
-        char cwd[1024];
-        if (getcwd(cwd, sizeof(cwd))) {
-                size_t cwd_len = strlen(cwd);
-                if (strncmp(result_filepath, cwd, cwd_len) == 0
-                    && result_filepath[cwd_len] == '/') {
-                        display_path = result_filepath + cwd_len + 1;
-                }
-        }
-        snprintf(msg, sizeof(msg), "Match %d/%d: %s:%d:%d", index + 1,
-                 num_results, display_path, result_row + 1, result_col + 1);
-        display_message(1, msg);
-}
-
-void toggle_workspace_find(void)
-{
-        free_workspace_search();
-        char *query = prompt("Find in workspace: %s (ESC to cancel)");
-        if (query == NULL) {
-                refresh_screen();
-                return;
-        }
+        free_search();
         if (strlen(query) == 0) {
-                free(query);
-                refresh_screen();
                 return;
         }
-        if (Editor.query)
-                free(Editor.query);
-        Editor.query = strdup(query);
-        char cwd[1024];
-        if (!getcwd(cwd, sizeof(cwd))) {
-                free(query);
-                display_message(2, "Could not get current directory");
-                refresh_screen();
-                return;
-        }
-        refresh_screen();
-        collect_and_search_files(cwd, query, 0);
-        free(query);
-        if (num_results > 0) {
-                current_index = 0;
-                jump_to_result(0);
-        } else {
-                display_message(2, "No matches found in workspace");
-        }
-        refresh_screen();
+        search_directory_recursive(".", query, 0);
+        qsort(search_state.results, search_state.result_count, sizeof(struct SearchResult), compare_results);
+        search_state.selected_index = 0;
+        search_state.scroll_offset = 0;
 }
 
-void workspace_find_next(int direction)
+void render_search_interface(void)
 {
-        if (num_results == 0) {
-                refresh_screen();
+        int rows = get_window_rows();
+        int cols = get_window_cols();
+        printf("\033[2J\033[H");
+        printf("\033[7m");
+        printf(" SEARCH: %s", search_state.query);
+        for (int i = strlen(search_state.query) + 9; i < cols; i++) {
+                printf(" ");
+        }
+        printf("\033[0m\r\n");
+        int visible_rows = rows - 3;
+        int end_index = search_state.scroll_offset + visible_rows;
+        if (end_index > search_state.result_count) {
+                end_index = search_state.result_count;
+        }
+        for (int i = search_state.scroll_offset; i < end_index; i++) {
+                struct SearchResult *result = &search_state.results[i];
+                if (i == search_state.selected_index) {
+                        printf("\033[7m");
+                }
+                char display[512];
+                snprintf(display, sizeof(display), " %s:%d: %s", result->filepath, result->line_number, result->line_content);
+                if (strlen(display) > (size_t) cols) {
+                        display[cols - 4] = '.';
+                        display[cols - 3] = '.';
+                        display[cols - 2] = '.';
+                        display[cols - 1] = '\0';
+                }
+                printf("%s", display);
+                for (int j = strlen(display); j < cols; j++) {
+                        printf(" ");
+                }
+                if (i == search_state.selected_index) {
+                        printf("\033[0m");
+                }
+                printf("\r\n");
+        }
+        for (int i = end_index - search_state.scroll_offset; i < visible_rows;
+             i++) {
+                printf("~\r\n");
+        }
+        printf("\033[7m");
+        char status[256];
+        snprintf(status, sizeof(status), " %d results", search_state.result_count);
+        printf("%s", status);
+        for (int i = strlen(status); i < cols; i++) {
+                printf(" ");
+        }
+        printf("\033[0m");
+        fflush(stdout);
+}
+
+void search_move_up(void)
+{
+        if (search_state.selected_index > 0) {
+                search_state.selected_index--;
+                if (search_state.selected_index < search_state.scroll_offset) {
+                        search_state.scroll_offset = search_state.selected_index;
+                }
+        }
+}
+
+void search_move_down(void)
+{
+        if (search_state.selected_index < search_state.result_count - 1) {
+                search_state.selected_index++;
+                int visible_rows = get_window_rows() - 3;
+                if (search_state.selected_index >=
+                    search_state.scroll_offset + visible_rows) {
+                        search_state.scroll_offset = search_state.selected_index - visible_rows + 1;
+                }
+        }
+}
+
+void search_select(void)
+{
+        if (search_state.result_count == 0)
                 return;
+        struct SearchResult *result = &search_state.results[search_state.selected_index];
+        load_file(result->filepath);
+        editor.cursor_y = result->line_number - 1;
+        if (editor.cursor_y >= editor.line_numbers) {
+                editor.cursor_y = editor.line_numbers - 1;
         }
-        current_index += direction;
-        if (current_index >= num_results) {
-                current_index = 0;
-        } else if (current_index < 0) {
-                current_index = num_results - 1;
+        if (editor.cursor_y < 0) {
+                editor.cursor_y = 0;
         }
-        jump_to_result(current_index);
-        refresh_screen();
+        editor.cursor_x = 0;
+        int rows = get_window_rows() - 2;
+        int center_offset = editor.cursor_y - (rows / 2);
+        if (center_offset < 0) {
+                editor.offset_y = 0;
+        } else if (center_offset + rows > editor.line_numbers) {
+                editor.offset_y = editor.line_numbers - rows;
+                if (editor.offset_y < 0) {
+                        editor.offset_y = 0;
+                }
+        } else {
+                editor.offset_y = center_offset;
+        }
+        search_mode = 0;
+        free_search();
+}
+
+void search_add_char(char c)
+{
+        if (search_state.query_len < MAX_SEARCH_QUERY - 1) {
+                search_state.query[search_state.query_len++] = c;
+                search_state.query[search_state.query_len] = '\0';
+                search_directory(search_state.query);
+        }
+}
+
+void search_remove_char(void)
+{
+        if (search_state.query_len > 0) {
+                search_state.query_len--;
+                search_state.query[search_state.query_len] = '\0';
+                search_directory(search_state.query);
+        }
 }

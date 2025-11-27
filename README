@@ -1,9 +1,7 @@
-+---------------+
-|    ATE 4.0    |
-+---------------+
+             ate -- another text editor
 
-        Full screen editor based on Vim
+Purpose
 
-        Vim was written by Bram Moolenaar and
-        greatly modified into Neovim.
-
+ATE is a tiny terminal text editor made to keep things
+simple. Based on other editors, it’s meant as a personal
+tool for quick editing and full control.

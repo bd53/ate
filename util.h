@@ -1,11 +1,8 @@
 #ifndef UTIL_H
 #define UTIL_H
 
-#include "efunc.h"
-
-void run_cleanup(void);
-void die(const char *s);
-int fetch(int *rows, int *cols);
-void append(struct Buffer *ab, const char *s, int len);
+void refresh_screen(void);
+int get_window_rows(void);
+int get_window_cols(void);
 
 #endif
