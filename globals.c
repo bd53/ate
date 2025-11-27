@@ -28,3 +28,4 @@ struct SearchState search_state = { 0 };
 int help_mode = 0;
 struct GotoState goto_state;
 int goto_mode = 0;
+int tags_mode = 0;

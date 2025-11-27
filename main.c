@@ -51,6 +51,8 @@ int main(int argc, char *argv[])
                         render_goto_interface();
                 } else if (help_mode) {
                         render_help();
+                } else if (tags_mode) {
+                        render_tags();
                 } else if (search_mode) {
                         render_search_interface();
                 } else if (browse_mode) {
@@ -75,6 +77,7 @@ int main(int argc, char *argv[])
                 free_filetree();
         }
         cleanup_help();
+        cleanup_tags();
         for (int i = 0; i < editor.line_numbers; i++) {
                 free(editor.lines[i]);
         }

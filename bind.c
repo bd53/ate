@@ -29,7 +29,7 @@ int read_esc_sequence(void)
                                         if (read(STDIN_FILENO, &extra[2], 1) != 1)
                                                 return 0;
                                         char direction = extra[2];
-                                        if (!search_mode && !help_mode) {
+                                        if (!search_mode && !help_mode && !tags_mode) {
                                                 if (browse_mode) {
                                                         switch (direction) {
                                                         case KEY_ARROW_UP:
@@ -74,7 +74,7 @@ int read_esc_sequence(void)
                         }
                 } else {
                         char direction = seq[1];
-                        if (!search_mode && !help_mode) {
+                        if (!search_mode && !help_mode && !tags_mode) {
                                 if (browse_mode) {
                                         switch (direction) {
                                         case KEY_ARROW_UP:
@@ -124,6 +124,19 @@ int read_esc_sequence(void)
                                 case KEY_ARROW_RIGHT:
                                         break;
                                 }
+                        } else if (tags_mode) {
+                                switch (direction) {
+                                case KEY_ARROW_UP:
+                                        tags_move_up();
+                                        break;
+                                case KEY_ARROW_DOWN:
+                                        tags_move_down();
+                                        break;
+                                case KEY_ARROW_LEFT:
+                                        break;
+                                case KEY_ARROW_RIGHT:
+                                        break;
+                                }
                         } else {
                                 switch (direction) {
                                 case KEY_ARROW_UP:
@@ -140,7 +153,7 @@ int read_esc_sequence(void)
                         }
                 }
         }
-        if (!search_mode && !browse_mode && !help_mode) {
+        if (!search_mode && !browse_mode && !help_mode && !tags_mode) {
                 int len = strlen(editor.lines[editor.cursor_y]);
                 if (editor.cursor_x > len)
                         editor.cursor_x = len;
@@ -172,6 +185,10 @@ int process_keypress(char c)
         }
         if (c == KEY_CTRL_H) {
                 toggle_help();
+                return 1;
+        }
+        if (c == KEY_CTRL_Y) {
+                toggle_tags();
                 return 1;
         }
         if (c == KEY_CTRL_G) {
@@ -223,6 +240,16 @@ int process_keypress(char c)
                                 read_esc_sequence();
                         } else {
                                 toggle_help();
+                        }
+                }
+                return 1;
+        }
+        if (tags_mode) {
+                if (c == KEY_ESC) {
+                        if (is_escape_sequence()) {
+                                read_esc_sequence();
+                        } else {
+                                toggle_tags();
                         }
                 }
                 return 1;

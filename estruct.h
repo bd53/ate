@@ -14,6 +14,7 @@ extern int browse_mode;
 extern int search_mode;
 extern int help_mode;
 extern int goto_mode;
+extern int tags_mode;
 
 struct EditorState {
         char **lines;

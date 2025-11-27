@@ -7,6 +7,7 @@
 #define KEY_CTRL_F 6
 #define KEY_CTRL_G 7
 #define KEY_CTRL_H 8
+#define KEY_CTRL_Y 25
 #define KEY_BACKSPACE 127
 #define KEY_ENTER 13
 #define KEY_ESC 27

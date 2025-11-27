@@ -27,6 +27,13 @@ void cleanup_help(void);
 void ttopen(void);
 void ttclose(void);
 
+/* tags.c */
+void toggle_tags(void);
+void tags_move_up(void);
+void tags_move_down(void);
+void render_tags(void);
+void cleanup_tags(void);
+
 /* tree.c */
 void init_filetree(const char *path);
 void free_filetree(void);
