@@ -102,7 +102,7 @@ static void search_directory_recursive(const char *dirpath, const char *query, i
                         continue;
                 if (S_ISDIR(st.st_mode)) {
                         if (strcmp(entry->d_name, ".git") == 0 ||
-                                strcmp(entry->d_name, ".o") == 0)
+                            strcmp(entry->d_name, ".o") == 0)
                                 continue;
                         search_directory_recursive(fullpath, query, depth + 1);
                 } else if (S_ISREG(st.st_mode)) {

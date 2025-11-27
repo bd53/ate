@@ -11,6 +11,9 @@ extern struct FileTree filetree;
 extern struct SearchState search_state;
 extern int browse_mode;
 extern int search_mode;
+extern int search_mode;
+extern int browse_mode;
+extern int help_mode;
 
 struct EditorState {
         char **lines;

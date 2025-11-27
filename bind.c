@@ -27,7 +27,7 @@ int read_esc_sequence(void)
                                         if (read(STDIN_FILENO, &extra[2], 1) != 1)
                                                 return 0;
                                         char direction = extra[2];
-                                        if (!search_mode) {
+                                        if (!search_mode && !help_mode) {
                                                 if (browse_mode) {
                                                         switch (direction) {
                                                         case KEY_ARROW_UP:
@@ -72,7 +72,7 @@ int read_esc_sequence(void)
                         }
                 } else {
                         char direction = seq[1];
-                        if (!search_mode) {
+                        if (!search_mode && !help_mode) {
                                 if (browse_mode) {
                                         switch (direction) {
                                         case KEY_ARROW_UP:
@@ -96,7 +96,8 @@ int read_esc_sequence(void)
                                                 if (editor.cursor_y < editor.line_numbers - 1)
                                                         editor.cursor_y++;
                                                 break;
-                                        case KEY_ARROW_RIGHT:{
+                                        case KEY_ARROW_RIGHT:
+                                                {
                                                         int line_len = strlen(editor.lines[editor.cursor_y]);
                                                         if (editor.cursor_x < line_len)
                                                                 editor.cursor_x++;
@@ -107,6 +108,19 @@ int read_esc_sequence(void)
                                                         editor.cursor_x--;
                                                 break;
                                         }
+                                }
+                        } else if (help_mode) {
+                                switch (direction) {
+                                case KEY_ARROW_UP:
+                                        help_move_up();
+                                        break;
+                                case KEY_ARROW_DOWN:
+                                        help_move_down();
+                                        break;
+                                case KEY_ARROW_LEFT:
+                                        break;
+                                case KEY_ARROW_RIGHT:
+                                        break;
                                 }
                         } else {
                                 switch (direction) {
@@ -124,7 +138,7 @@ int read_esc_sequence(void)
                         }
                 }
         }
-        if (!search_mode && !browse_mode) {
+        if (!search_mode && !browse_mode && !help_mode) {
                 int len = strlen(editor.lines[editor.cursor_y]);
                 if (editor.cursor_x > len)
                         editor.cursor_x = len;
@@ -142,23 +156,35 @@ int process_keypress(char c)
         if (c == KEY_CTRL_Q) {
                 return 0;
         }
+        if (c == KEY_CTRL_H) {
+                toggle_help();
+                return 1;
+        }
         if (c == KEY_CTRL_F) {
                 if (search_mode) {
-                        return 1;
+                        search_mode = 0;
+                        free_search();
                 } else {
                         search_mode = 1;
                         init_search();
-                        return 1;
                 }
+                return 1;
         }
         if (c == KEY_CTRL_P) {
                 if (browse_mode) {
-                        return 1;
+                        browse_mode = 0;
+                        free_filetree();
                 } else {
                         browse_mode = 1;
                         init_filetree(".");
-                        return 1;
                 }
+                return 1;
+        }
+        if (help_mode) {
+                if (c == KEY_ESC) {
+                        read_esc_sequence();
+                }
+                return 1;
         }
         if (search_mode) {
                 if (c == KEY_ENTER) {

@@ -1,10 +1,10 @@
-# makefile for ate, updated Thu Nov 27 02:24:51 AM EST 2025
+# makefile for ate, updated Thu Nov 27 07:55:39 AM EST 2025
 
 PROGRAM=ate
 
-SRC=bind.c buffer.c file.c globals.c main.c posix.c search.c tree.c util.c version.c
+SRC=bind.c buffer.c file.c globals.c help.c main.c posix.c search.c tree.c util.c version.c
 
-OBJ=bind.o buffer.o file.o globals.o main.o posix.o search.o tree.o util.o version.o
+OBJ=bind.o buffer.o file.o globals.o help.o main.o posix.o search.o tree.o util.o version.o
 
 HDR=ebind.h edef.h efunc.h estruct.h util.h version.h
 

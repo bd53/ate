@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
 #include "ebind.h"
 #include "efunc.h"
 #include "estruct.h"
@@ -46,7 +47,9 @@ int main(int argc, char *argv[])
                 init_filetree(".");
         }
         while (1) {
-                if (search_mode) {
+                if (help_mode) {
+                        render_help();
+                } else if (search_mode) {
                         render_search_interface();
                 } else if (browse_mode) {
                         render_filetree();
@@ -66,6 +69,7 @@ int main(int argc, char *argv[])
         if (browse_mode) {
                 free_filetree();
         }
+        cleanup_help();
         for (int i = 0; i < editor.line_numbers; i++) {
                 free(editor.lines[i]);
         }

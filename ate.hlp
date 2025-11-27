@@ -1,0 +1,13 @@
+ate.hlp         ate
+                                ATE - help
+
+      Move around:   Use the cursor keys.
+   Get out of ate:   Use "ctrl+q" (careful, all changes are lost!)
+
+Jump to a subject:   Type CTRL+ARROWKEYS. Repeat to go where you want.
+
+Explore directory:   Use CTRL+P, then <enter> to view contents of a directory
+                     or file.
+
+  Find in project:   With CTRL+F you're able to query a search through your entire
+                     project workspace.

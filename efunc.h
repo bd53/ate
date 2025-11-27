@@ -11,6 +11,13 @@ void indent_line(void);
 void load_file(const char *filename);
 int save_file(void);
 
+/* help.c */
+void toggle_help(void);
+void help_move_up(void);
+void help_move_down(void);
+void render_help(void);
+void cleanup_help(void);
+
 /* posix.c */
 void ttopen(void);
 void ttclose(void);
