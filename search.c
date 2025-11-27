@@ -144,7 +144,7 @@ void render_search_interface(void)
         int cols = get_window_cols();
         printf("\033[2J\033[H");
         printf("\033[7m");
-        printf(" SEARCH: %s", search_state.query);
+        printf(" Find: %s", search_state.query);
         for (int i = strlen(search_state.query) + 9; i < cols; i++) {
                 printf(" ");
         }

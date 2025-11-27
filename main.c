@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
                 } else if (browse_mode) {
                         render_filetree();
                 } else {
-                        refresh_screen();
+                        refresh();
                 }
                 char c;
                 if (read(STDIN_FILENO, &c, 1) != 1)

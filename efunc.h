@@ -11,6 +11,7 @@ void indent_line(void);
 int char_display_width(char c, int col_pos);
 void buffer_to_screen_pos(int line_idx, int cursor_x, int screen_width, int *screen_line, int *screen_col);
 int get_wrapped_line_count(int line_idx, int screen_width);
+void refresh(void);
 
 /* file.c */
 void load_file(const char *filename);
