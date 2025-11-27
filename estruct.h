@@ -9,11 +9,11 @@ extern struct termios original;
 extern struct EditorState editor;
 extern struct FileTree filetree;
 extern struct SearchState search_state;
+extern struct GotoState goto_state;
 extern int browse_mode;
 extern int search_mode;
-extern int search_mode;
-extern int browse_mode;
 extern int help_mode;
+extern int goto_mode;
 
 struct EditorState {
         char **lines;
@@ -52,6 +52,12 @@ struct SearchState {
         int scroll_offset;
         char query[MAX_SEARCH_QUERY];
         int query_len;
+};
+
+struct GotoState {
+        char input[MAX_GOTO_INPUT];
+        int input_len;
+        char error_msg[64];
 };
 
 #endif

@@ -2,10 +2,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/select.h>
 
 #include "ebind.h"
 #include "estruct.h"
 #include "efunc.h"
+#include "search.h"
 #include "util.h"
 
 int read_esc_sequence(void)
@@ -151,6 +153,18 @@ int read_esc_sequence(void)
         return 1;
 }
 
+int is_escape_sequence(void)
+{
+        fd_set readfds;
+        struct timeval timeout;
+        FD_ZERO(&readfds);
+        FD_SET(STDIN_FILENO, &readfds);
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 10000;
+        int result = select(STDIN_FILENO + 1, &readfds, NULL, NULL, &timeout);
+        return result > 0;
+}
+
 int process_keypress(char c)
 {
         if (c == KEY_CTRL_Q) {
@@ -158,6 +172,16 @@ int process_keypress(char c)
         }
         if (c == KEY_CTRL_H) {
                 toggle_help();
+                return 1;
+        }
+        if (c == KEY_CTRL_G) {
+                if (goto_mode) {
+                        goto_mode = 0;
+                        free_goto();
+                } else {
+                        goto_mode = 1;
+                        init_goto();
+                }
                 return 1;
         }
         if (c == KEY_CTRL_F) {
@@ -180,9 +204,26 @@ int process_keypress(char c)
                 }
                 return 1;
         }
+        if (goto_mode) {
+                if (c == KEY_ENTER) {
+                        goto_execute();
+                } else if (c == KEY_BACKSPACE) {
+                        goto_remove_char();
+                } else if (c == KEY_ESC) {
+                        goto_mode = 0;
+                        free_goto();
+                } else if (isdigit(c)) {
+                        goto_add_char(c);
+                }
+                return 1;
+        }
         if (help_mode) {
                 if (c == KEY_ESC) {
-                        read_esc_sequence();
+                        if (is_escape_sequence()) {
+                                read_esc_sequence();
+                        } else {
+                                toggle_help();
+                        }
                 }
                 return 1;
         }
@@ -192,7 +233,12 @@ int process_keypress(char c)
                 } else if (c == KEY_BACKSPACE) {
                         search_remove_char();
                 } else if (c == KEY_ESC) {
-                        read_esc_sequence();
+                        if (is_escape_sequence()) {
+                                read_esc_sequence();
+                        } else {
+                                search_mode = 0;
+                                free_search();
+                        }
                 } else if (!iscntrl(c)) {
                         search_add_char(c);
                 }
@@ -204,7 +250,12 @@ int process_keypress(char c)
                 } else if (c == '-') {
                         filetree_go_parent();
                 } else if (c == KEY_ESC) {
-                        read_esc_sequence();
+                        if (is_escape_sequence()) {
+                                read_esc_sequence();
+                        } else {
+                                browse_mode = 0;
+                                free_filetree();
+                        }
                 }
                 return 1;
         }

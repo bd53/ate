@@ -2,9 +2,11 @@ ate.hlp         ate
                                 ATE - help
 
       Move around:   Use the cursor keys.
+Close this window:   Use "esc".
    Get out of ate:   Use "ctrl+q" (careful, all changes are lost!)
 
 Jump to a subject:   Type CTRL+ARROWKEYS. Repeat to go where you want.
+     Jump to line:   Use CTRL+G in current buffer.
 
 Explore directory:   Use CTRL+P, then <enter> to view contents of a directory
                      or file.

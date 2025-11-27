@@ -47,7 +47,9 @@ int main(int argc, char *argv[])
                 init_filetree(".");
         }
         while (1) {
-                if (help_mode) {
+                if (goto_mode) {
+                        render_goto_interface();
+                } else if (help_mode) {
                         render_help();
                 } else if (search_mode) {
                         render_search_interface();
@@ -62,6 +64,9 @@ int main(int argc, char *argv[])
                 if (!process_keypress(c)) {
                         break;
                 }
+        }
+        if (goto_mode) {
+                free_goto();
         }
         if (search_mode) {
                 free_search();

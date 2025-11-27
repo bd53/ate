@@ -26,3 +26,5 @@ int browse_mode = 0;
 int search_mode = 0;
 struct SearchState search_state = { 0 };
 int help_mode = 0;
+struct GotoState goto_state;
+int goto_mode = 0;

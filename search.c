@@ -260,3 +260,106 @@ void search_remove_char(void)
                 search_directory(search_state.query);
         }
 }
+
+void init_goto(void)
+{
+        memset(&goto_state, 0, sizeof(struct GotoState));
+        goto_state.input[0] = '\0';
+        goto_state.input_len = 0;
+        goto_state.error_msg[0] = '\0';
+}
+
+void free_goto(void)
+{
+        goto_state.input_len = 0;
+        goto_state.input[0] = '\0';
+        goto_state.error_msg[0] = '\0';
+}
+
+void render_goto_interface(void)
+{
+        int rows = get_window_rows();
+        int cols = get_window_cols();
+        printf("\033[2J\033[H");
+        printf("\033[7m");
+        printf(" Go to line: %s", goto_state.input);
+        for (int i = strlen(goto_state.input) + 13; i < cols; i++) {
+                printf(" ");
+        }
+        printf("\033[0m\r\n");
+        printf("\r\n");
+        printf(" Current line: %d\r\n", editor.cursor_y + 1);
+        printf(" Total lines: %d\r\n", editor.line_numbers);
+        printf("\r\n");
+        if (goto_state.error_msg[0] != '\0') {
+                printf("\033[31m Error: %s\033[0m\r\n", goto_state.error_msg);
+        } else {
+                // do nothing
+        }
+        for (int i = 6; i < rows - 1; i++) {
+                printf("~\r\n");
+        }
+        printf("\033[7m");
+        char status[256];
+        snprintf(status, sizeof(status), " Press ENTER to jump, ESC to cancel");
+        printf("%s", status);
+        for (int i = strlen(status); i < cols; i++) {
+                printf(" ");
+        }
+        printf("\033[0m");
+        fflush(stdout);
+}
+
+void goto_add_char(char c)
+{
+        if (!isdigit(c))
+                return;
+        if (goto_state.input_len < MAX_GOTO_INPUT - 1) {
+                goto_state.input[goto_state.input_len++] = c;
+                goto_state.input[goto_state.input_len] = '\0';
+                goto_state.error_msg[0] = '\0';
+        }
+}
+
+void goto_remove_char(void)
+{
+        if (goto_state.input_len > 0) {
+                goto_state.input_len--;
+                goto_state.input[goto_state.input_len] = '\0';
+                goto_state.error_msg[0] = '\0';
+        }
+}
+
+void goto_execute(void)
+{
+        if (goto_state.input_len == 0) {
+                strncpy(goto_state.error_msg, "No line number entered",
+                        sizeof(goto_state.error_msg) - 1);
+                return;
+        }
+        int target_line = atoi(goto_state.input);
+        if (target_line < 1) {
+                snprintf(goto_state.error_msg, sizeof(goto_state.error_msg), "Line number must be at least 1");
+                return;
+        }
+        if (target_line > editor.line_numbers) {
+                snprintf(goto_state.error_msg, sizeof(goto_state.error_msg), "Line %d exceeds total lines (%d)", target_line, editor.line_numbers);
+                return;
+        }
+        editor.cursor_y = target_line - 1;
+        editor.cursor_x = 0;
+        int rows = get_window_rows() - 2;
+        int center_offset = editor.cursor_y - (rows / 2);
+        if (center_offset < 0) {
+                editor.offset_y = 0;
+        } else if (center_offset + rows > editor.line_numbers) {
+                editor.offset_y = editor.line_numbers - rows;
+                if (editor.offset_y < 0) {
+                        editor.offset_y = 0;
+                }
+        } else {
+                editor.offset_y = center_offset;
+        }
+        goto_mode = 0;
+        free_goto();
+}

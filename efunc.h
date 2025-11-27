@@ -43,5 +43,11 @@ void search_select(void);
 void search_add_char(char c);
 void search_remove_char(void);
 int fuzzy_match(const char *pattern, const char *str);
+void init_goto(void);
+void free_goto(void);
+void render_goto_interface(void);
+void goto_add_char(char c);
+void goto_remove_char(void);
+void goto_execute(void);
 
 #endif
