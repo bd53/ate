@@ -7,9 +7,9 @@
 #include "ebind.h"
 #include "efunc.h"
 #include "estruct.h"
+#include "search.h"
 #include "util.h"
 #include "version.h"
-#include "search.h"
 
 static void usage(void)
 {

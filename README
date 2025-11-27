@@ -1,7 +1,19 @@
-             ate -- another text editor
+		ate -- another text editor
 
-Purpose
+Overview
 
-ATE is a tiny terminal text editor made to keep things
-simple. Based on other editors, it’s meant as a personal
-tool for quick editing and full control.
+        ATE is a tiny terminal text editor made to keep things
+        simple. It’s meant as a personal tool for quick editing
+        and full control.
+
+How to compile and install ATE
+
+        Clone the repository (if you haven't already done so):
+
+        git clone https://github.com/bd53/ate.git
+        cd ate
+        make
+        make install
+
+        It's that simple. It will be installed to a
+        default installation directory of /usr/local/bin.

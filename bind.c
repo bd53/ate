@@ -1,12 +1,12 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/select.h>
+#include <unistd.h>
 
 #include "ebind.h"
-#include "estruct.h"
 #include "efunc.h"
+#include "estruct.h"
 #include "search.h"
 #include "util.h"
 
