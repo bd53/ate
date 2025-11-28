@@ -1,10 +1,10 @@
-# makefile for ate, updated Thu Nov 27 11:39:13 AM EST 2025
+# makefile for ate, updated Fri Nov 28 03:58:13 AM EST 2025
 
 PROGRAM=ate
 
-SRC=bind.c buffer.c display.c file.c globals.c help.c main.c posix.c search.c tags.c tree.c util.c version.c
+SRC=bind.c buffer.c display.c eval.c file.c globals.c input.c main.c posix.c search.c tree.c util.c version.c
 
-OBJ=bind.o buffer.o display.o file.o globals.o help.o main.o posix.o search.o tags.o tree.o util.o version.o
+OBJ=bind.o buffer.o display.o eval.o file.o globals.o input.o main.o posix.o search.o tree.o util.o version.o
 
 HDR=ebind.h edef.h efunc.h estruct.h util.h version.h
 
@@ -16,6 +16,7 @@ CFLAGS=-O2 $(WARNINGS) -g
 DEFINES=-DAUTOCONF -DPOSIX -DUSG -D_XOPEN_SOURCE=600 -D_GNU_SOURCE
 LIBS=-lcurses
 BINDIR=/usr/local/bin
+LIBDIR=/usr/local/lib
 
 $(PROGRAM): $(OBJ)
 	@echo "  LINK    " $@
@@ -33,7 +34,9 @@ clean:
 
 install: $(PROGRAM)
 	cp $(PROGRAM) ${BINDIR}/
+	cp ate.hlp ${LIBDIR}/ate.hlp
 	chmod 755 ${BINDIR}/$(PROGRAM)
+	chmod 644 ${LIBDIR}/ate.hlp
 
 lint: $(SRC)
 	@rm -f lintout
