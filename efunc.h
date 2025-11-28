@@ -20,12 +20,10 @@ void delete_character(void);
 void draw_content(struct Buffer *ab);
 
 /* display.c */
-void refresh_screen(void);
-int display_editor(char *filename);
-void display_help(void);
-void display_tags(void);
-void display_status(struct Buffer *ab);
-void display_message(int type, const char *message);
+void refresh(void);
+int init(char *filename);
+void status(struct Buffer *ab);
+void notify(int type, const char *message);
 
 /* eval.c */
 void check_health(void);

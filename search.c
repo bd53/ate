@@ -144,7 +144,7 @@ static void jump_to_result(int index)
         if (Editor.modified && Editor.filename)
                 save_file();
         if (!Editor.filename || strcmp(Editor.filename, result_filepath) != 0)
-                display_editor(result_filepath);
+                init(result_filepath);
         if (result_row >= 0 && result_row < Editor.buffer_rows) {
                 Editor.cursor_y = result_row;
                 Editor.cursor_x = result_col;
@@ -187,7 +187,7 @@ static void jump_to_result(int index)
                 }
         }
         snprintf(msg, sizeof(msg), "Match %d/%d: %.*s:%d:%d", index + 1, num_results, MAX_DISPLAY_PATH, display_path, result_row + 1, result_col + 1);
-        display_message(1, msg);
+        notify(1, msg);
 }
 
 void toggle_workspace_find(void)
@@ -195,12 +195,12 @@ void toggle_workspace_find(void)
         free_workspace_search();
         char *query = prompt("Find in workspace: %s (ESC to cancel)");
         if (!query) {
-                refresh_screen();
+                refresh();
                 return;
         }
         if (strlen(query) == 0) {
                 free(query);
-                refresh_screen();
+                refresh();
                 return;
         }
         if (Editor.query)
@@ -209,26 +209,26 @@ void toggle_workspace_find(void)
         char cwd[1024];
         if (!getcwd(cwd, sizeof(cwd))) {
                 free(query);
-                display_message(2, "Could not get current directory");
-                refresh_screen();
+                notify(2, "Could not get current directory");
+                refresh();
                 return;
         }
-        refresh_screen();
+        refresh();
         collect_and_search_files(cwd, query, 0);
         free(query);
         if (num_results > 0) {
                 current_index = 0;
                 jump_to_result(0);
         } else {
-                display_message(2, "No matches found in workspace");
+                notify(2, "No matches found in workspace");
         }
-        refresh_screen();
+        refresh();
 }
 
 void workspace_find_next(int direction)
 {
         if (num_results == 0) {
-                refresh_screen();
+                refresh();
                 return;
         }
         current_index += direction;
@@ -238,5 +238,5 @@ void workspace_find_next(int direction)
                 current_index = num_results - 1;
         }
         jump_to_result(current_index);
-        refresh_screen();
+        refresh();
 }

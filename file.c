@@ -11,7 +11,7 @@ void save_file(void)
         if (Editor.filename == NULL) {
                 char *filename = prompt("Save as: %s (ESC to cancel)");
                 if (filename == NULL) {
-                        refresh_screen();
+                        refresh();
                         return;
                 }
                 if (Editor.filename)
@@ -20,7 +20,7 @@ void save_file(void)
         }
         FILE *fp = fopen(Editor.filename, "w");
         if (fp == NULL) {
-                refresh_screen();
+                refresh();
                 return;
         }
         for (int i = 0; i < Editor.buffer_rows; i++) {
@@ -28,30 +28,30 @@ void save_file(void)
                 fputc('\n', fp);
         }
         if (fclose(fp) == EOF) {
-                refresh_screen();
+                refresh();
                 return;
         }
         Editor.modified = 0;
-        refresh_screen();
+        refresh();
 }
 
 void open_file(void)
 {
         char *filename = prompt("Open file: %s (ESC to cancel)");
         if (!filename) {
-                refresh_screen();
+                refresh();
                 return;
         }
         if (Editor.file_tree)
                 free_file_entries();
         Editor.file_tree = 0;
         Editor.help_view = 0;
-        display_editor(filename);
+        init(filename);
         free(filename);
         if (Editor.buffer_rows == 0)
                 append_row("", 0);
         Editor.cursor_x = 0;
         Editor.cursor_y = 0;
         Editor.row_offset = 0;
-        refresh_screen();
+        refresh();
 }

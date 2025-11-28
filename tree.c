@@ -221,7 +221,7 @@ void open_file_tree(void)
                 Editor.help_view = 0;
                 Editor.file_tree = 0;
                 Editor.tag_view = 0;
-                display_editor(file_paths[entry_index]);
+                init(file_paths[entry_index]);
                 if (Editor.buffer_rows == 0)
                         append_row("", 0);
                 Editor.cursor_x = 0;
@@ -247,5 +247,5 @@ void toggle_file_tree(void)
                 Editor.cursor_y = 0;
                 Editor.row_offset = 0;
         }
-        refresh_screen();
+        refresh();
 }

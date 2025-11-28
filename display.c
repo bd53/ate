@@ -7,7 +7,7 @@
 #include "efunc.h"
 #include "util.h"
 
-static void reset_editor_state(char *filename)
+static void reset(char *filename)
 {
         free_rows();
         free_file_entries();
@@ -24,18 +24,33 @@ static void reset_editor_state(char *filename)
         Editor.tag_view = 0;
 }
 
-void refresh_screen(void)
+void refresh(void)
 {
         if (Editor.cursor_y < Editor.row_offset)
                 Editor.row_offset = Editor.cursor_y;
-        if (Editor.cursor_y >= Editor.row_offset + Editor.editor_rows)
-                Editor.row_offset = Editor.cursor_y - Editor.editor_rows + 1;
+        Editor.gutter_width = calculate();
+        int content_width = Editor.editor_cols - Editor.gutter_width;
+        if (content_width <= 0)
+                content_width = 1;
+        int cursor_wrap_line = 0;
+        if (Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) {
+                cursor_wrap_line = Editor.cursor_x / content_width;
+        }
+        int total_screen_rows = 0;
+        for (int filerow = Editor.row_offset; filerow < Editor.cursor_y && filerow < Editor.buffer_rows; filerow++) {
+                int wrapped = (Editor.row[filerow].size + content_width - 1) / content_width;
+                total_screen_rows += (wrapped > 0 ? wrapped : 1);
+        }
+        total_screen_rows += cursor_wrap_line + 1;
+        while (total_screen_rows > Editor.editor_rows && Editor.row_offset < Editor.cursor_y) {
+                int wrapped = (Editor.row[Editor.row_offset].size + content_width - 1) / content_width;
+                Editor.row_offset++;
+                total_screen_rows -= (wrapped > 0 ? wrapped : 1);
+        }
         struct Buffer ab = BUFFER_INIT;
         append(&ab, "\x1b[?25l\x1b[H", 9);
         draw_content(&ab);
-        display_status(&ab);
-        Editor.gutter_width = calculate();
-        int content_width = Editor.editor_cols - Editor.gutter_width;
+        status(&ab);
         if (Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) {
                 struct Row *row = &Editor.row[Editor.cursor_y];
                 if (Editor.cursor_x > row->size)
@@ -69,7 +84,7 @@ void refresh_screen(void)
         free(ab.b);
 }
 
-int display_editor(char *filename)
+int init(char *filename)
 {
         if (filename == NULL)
                 return -1;
@@ -78,11 +93,11 @@ int display_editor(char *filename)
                 die("strdup");
         FILE *fp = fopen(filename, "r");
         if (!fp) {
-                reset_editor_state(new_filename);
+                reset(new_filename);
                 append_row("", 0);
                 return -1;
         }
-        reset_editor_state(new_filename);
+        reset(new_filename);
         char *line = NULL;
         size_t linecap = 0;
         ssize_t linelen;
@@ -96,45 +111,7 @@ int display_editor(char *filename)
         return 0;
 }
 
-void display_help(void)
-{
-        if (Editor.help_view) {
-                run_cleanup();
-                Editor.help_view = 0;
-                if (Editor.buffer_rows == 0)
-                        append_row("", 0);
-        } else {
-                run_cleanup();
-                display_editor("ate.hlp");
-                if (Editor.buffer_rows == 0)
-                        append_row("", 0);
-                Editor.help_view = 1;
-        }
-        refresh_screen();
-}
-
-void display_tags(void)
-{
-        if (Editor.tag_view) {
-                run_cleanup();
-                Editor.tag_view = 0;
-                if (Editor.buffer_rows == 0)
-                        append_row("", 0);
-        } else {
-                if (access("tags", F_OK) != 0) {
-                        display_message(2, "No tags file found");
-                        return;
-                }
-                run_cleanup();
-                display_editor("tags");
-                if (Editor.buffer_rows == 0)
-                        append_row("", 0);
-                Editor.tag_view = 1;
-        }
-        refresh_screen();
-}
-
-void display_status(struct Buffer *ab)
+void status(struct Buffer *ab)
 {
         if (ab == NULL)
                 return;
@@ -178,7 +155,7 @@ void display_status(struct Buffer *ab)
         append(ab, "\r\n", 2);
 }
 
-void display_message(int type, const char *message)
+void notify(int type, const char *message)
 {
         const char *color = (type == 1) ? "\x1b[32m" : "\x1b[31m";
         int prompt_row = Editor.editor_rows + 2;

@@ -134,6 +134,44 @@ static void handle_quit(void)
         exit(0);
 }
 
+static void handle_help(void)
+{
+        if (Editor.help_view) {
+                run_cleanup();
+                Editor.help_view = 0;
+                if (Editor.buffer_rows == 0)
+                        append_row("", 0);
+        } else {
+                run_cleanup();
+                init("ate.hlp");
+                if (Editor.buffer_rows == 0)
+                        append_row("", 0);
+                Editor.help_view = 1;
+        }
+        refresh();
+}
+
+static void handle_tags(void)
+{
+        if (Editor.tag_view) {
+                run_cleanup();
+                Editor.tag_view = 0;
+                if (Editor.buffer_rows == 0)
+                        append_row("", 0);
+        } else {
+                if (access("tags", F_OK) != 0) {
+                        notify(2, "No tags file found");
+                        return;
+                }
+                run_cleanup();
+                init("tags");
+                if (Editor.buffer_rows == 0)
+                        append_row("", 0);
+                Editor.tag_view = 1;
+        }
+        refresh();
+}
+
 static void handle_command(char *cmd)
 {
         while (isspace((unsigned char) *cmd))
@@ -144,8 +182,8 @@ static void handle_command(char *cmd)
         } commands[] = {
                 { "Ex", toggle_file_tree },
                 { "find", toggle_workspace_find },
-                { "help", display_help },
-                { "tags", display_tags },
+                { "help", handle_help },
+                { "tags", handle_tags },
                 { "checkhealth", check_health },
                 { NULL, NULL }
         };
@@ -161,7 +199,7 @@ static void handle_command(char *cmd)
                 if (Editor.buffer_rows == 0)
                         append_row("", 0);
                 Editor.cursor_x = Editor.cursor_y = Editor.row_offset = Editor.modified = 0;
-                refresh_screen();
+                refresh();
         } else if (strcmp(cmd, "quit") == 0) {
                 handle_quit();
         } else if (strcmp(cmd, "bd") == 0) {
@@ -188,7 +226,7 @@ static void handle_command(char *cmd)
                 if (!Editor.filename) {
                         char *filename = prompt("Save as: %s (ESC to cancel)");
                         if (!filename) {
-                                refresh_screen();
+                                refresh();
                                 return;
                         }
                         Editor.filename = filename;
@@ -197,9 +235,9 @@ static void handle_command(char *cmd)
         } else {
                 char msg[256];
                 snprintf(msg, sizeof(msg), "E182: Not an editor command: '%s'", cmd);
-                display_message(2, msg);
+                notify(2, msg);
                 input_read_key();
-                refresh_screen();
+                refresh();
         }
 }
 
@@ -216,7 +254,7 @@ static void command_mode(void)
                 struct Buffer ab = BUFFER_INIT;
                 append(&ab, "\x1b[?25l\x1b[H", 9);
                 draw_content(&ab);
-                display_status(&ab);
+                status(&ab);
                 char pos[64];
                 snprintf(pos, sizeof(pos), "\x1b[%d;1H\x1b[K:%s\x1b[%d;%dH\x1b[?25h", Editor.editor_rows + 2, buf, Editor.editor_rows + 2, (int) buflen + 2);
                 append(&ab, pos, strlen(pos));
@@ -232,12 +270,12 @@ static void command_mode(void)
                                 handle_command(buf);
                         Editor.mode = 0;
                         free(buf);
-                        refresh_screen();
+                        refresh();
                         return;
                 } else if (c == '\x1b') {
                         Editor.mode = 0;
                         free(buf);
-                        refresh_screen();
+                        refresh();
                         return;
                 } else if (c == 127 || c == CTRL_KEY('h')) {
                         if (buflen > 0)
@@ -284,7 +322,7 @@ static void handle_spec(int c)
                 return;
         case KEY_TOGGLE_HELP:
                 if (!is_file_tree)
-                        display_help();
+                        handle_help();
                 return;
         case KEY_ARROW_UP:
         case KEY_ARROW_DOWN:
@@ -301,7 +339,7 @@ static void handle_spec(int c)
                 cursor_move(c);
                 break;
         }
-        refresh_screen();
+        refresh();
 }
 
 static void yank_line(void)
@@ -326,7 +364,7 @@ static void yank_line(void)
         encoded[j] = '\0';
         dprintf(STDOUT_FILENO, "\x1b]52;c;%s\x07", encoded);
         free(encoded);
-        display_message(1, "Yanked");
+        notify(1, "Yanked");
 }
 
 static void delete_line(void)
@@ -334,7 +372,7 @@ static void delete_line(void)
         if (Editor.buffer_rows > 0 && Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) {
                 delete_row(Editor.cursor_y);
                 Editor.cursor_x = 0;
-                display_message(2, "Deleted");
+                notify(2, "Deleted");
         }
 }
 
@@ -343,7 +381,7 @@ static void goto_line(void)
         char *command = prompt("Go to line: ");
         if (!command) {
                 Editor.mode = 0;
-                refresh_screen();
+                refresh();
                 return;
         }
         char *trimmed = command;
@@ -365,12 +403,12 @@ static void goto_line(void)
                         Editor.row_offset = Editor.cursor_y;
                 if (Editor.cursor_y >= Editor.row_offset + Editor.editor_rows)
                         Editor.row_offset = Editor.cursor_y - Editor.editor_rows + 1;
-                display_message(2, "Jumped");
+                notify(2, "Jumped");
         } else {
-                display_message(1, "Invalid");
+                notify(1, "Invalid");
         }
         Editor.mode = 0;
-        refresh_screen();
+        refresh();
 }
 
 static void handle_normal_mode(int c)
@@ -392,13 +430,13 @@ static void handle_normal_mode(int c)
                 save_file();
                 return;
         case KEY_TOGGLE_HELP:
-                display_help();
+                handle_help();
                 return;
         case KEY_TOGGLE_FIND:
                 toggle_workspace_find();
                 return;
         case KEY_TOGGLE_TAGS:
-                display_tags();
+                handle_tags();
                 return;
         case KEY_TOGGLE_FILE_TREE:
                 toggle_file_tree();
@@ -514,7 +552,7 @@ void process_keypress(void)
                 break;
         case KEY_TOGGLE_TAGS:
                 if (Editor.mode == 0)
-                        display_tags();
+                        handle_tags();
                 break;
         case KEY_TOGGLE_FILE_TREE:
                 if (Editor.mode == 0)
@@ -524,7 +562,7 @@ void process_keypress(void)
                 if (Editor.mode == 1)
                         delete_line();
                 else if (Editor.mode == 0)
-                        display_help();
+                        handle_help();
                 break;
         case KEY_CTRL_BACKSPACE:
                 if (Editor.mode == 1)
@@ -556,5 +594,5 @@ void process_keypress(void)
                         handle_insert_mode(c);
                 break;
         }
-        refresh_screen();
+        refresh();
 }
