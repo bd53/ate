@@ -37,11 +37,25 @@ void free_file_entries(void)
         entries_capacity = 0;
 }
 
+static void cleanup_temp_arrays(char **names, char **paths, int *is_dir, int *depth, int count)
+{
+        if (names) {
+                for (int i = 0; i < count; i++)
+                        free(names[i]);
+                free(names);
+        }
+        if (paths) {
+                for (int i = 0; i < count; i++)
+                        free(paths[i]);
+                free(paths);
+        }
+        free(is_dir);
+        free(depth);
+}
+
 static void scan_directory(const char *path, int depth)
 {
-        if (depth > 5)
-                return;
-        if (path == NULL)
+        if (depth > 5 || !path)
                 return;
         DIR *dir = opendir(path);
         if (!dir)
@@ -54,9 +68,7 @@ static void scan_directory(const char *path, int depth)
         int temp_count = 0;
         int temp_capacity = 0;
         while ((entry = readdir(dir)) != NULL) {
-                if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
-                        continue;
-                if (entry->d_name[0] == '.')
+                if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0 || entry->d_name[0] == '.')
                         continue;
                 char full_path[1024];
                 snprintf(full_path, sizeof(full_path), "%s/%s", path, entry->d_name);
@@ -65,57 +77,17 @@ static void scan_directory(const char *path, int depth)
                         continue;
                 if (temp_count >= temp_capacity) {
                         temp_capacity = temp_capacity == 0 ? 32 : temp_capacity * 2;
-                        char **new_names = realloc(temp_names, sizeof(char *) * temp_capacity);
-                        char **new_paths = realloc(temp_paths, sizeof(char *) * temp_capacity);
-                        int *new_is_dir = realloc(temp_is_dir, sizeof(int) * temp_capacity);
-                        int *new_depth = realloc(temp_depth, sizeof(int) * temp_capacity);
-                        if (!new_names || !new_paths || !new_is_dir || !new_depth) {
-                                char **cleanup_names = new_names ? new_names : temp_names;
-                                char **cleanup_paths = new_paths ? new_paths : temp_paths;
-                                for (int i = 0; i < temp_count; i++) {
-                                        if (cleanup_names)
-                                                free(cleanup_names[i]);
-                                        if (cleanup_paths)
-                                                free(cleanup_paths[i]);
-                                }
-                                if (new_names)
-                                        free(new_names);
-                                else
-                                        free(temp_names);
-                                if (new_paths)
-                                        free(new_paths);
-                                else
-                                        free(temp_paths);
-                                if (new_is_dir)
-                                        free(new_is_dir);
-                                else
-                                        free(temp_is_dir);
-                                if (new_depth)
-                                        free(new_depth);
-                                else
-                                        free(temp_depth);
-                                closedir(dir);
-                                free_file_entries();
-                                die("realloc");
-                        }
-                        temp_names = new_names;
-                        temp_paths = new_paths;
-                        temp_is_dir = new_is_dir;
-                        temp_depth = new_depth;
+                        temp_names = safe_realloc(temp_names, sizeof(char *) * temp_capacity);
+                        temp_paths = safe_realloc(temp_paths, sizeof(char *) * temp_capacity);
+                        temp_is_dir = safe_realloc(temp_is_dir, sizeof(int) * temp_capacity);
+                        temp_depth = safe_realloc(temp_depth, sizeof(int) * temp_capacity);
                 }
                 temp_names[temp_count] = strdup(entry->d_name);
                 temp_paths[temp_count] = strdup(full_path);
                 if (!temp_names[temp_count] || !temp_paths[temp_count]) {
                         free(temp_names[temp_count]);
                         free(temp_paths[temp_count]);
-                        for (int i = 0; i < temp_count; i++) {
-                                free(temp_names[i]);
-                                free(temp_paths[i]);
-                        }
-                        free(temp_names);
-                        free(temp_paths);
-                        free(temp_is_dir);
-                        free(temp_depth);
+                        cleanup_temp_arrays(temp_names, temp_paths, temp_is_dir, temp_depth, temp_count);
                         closedir(dir);
                         free_file_entries();
                         die("strdup");
@@ -125,63 +97,53 @@ static void scan_directory(const char *path, int depth)
                 temp_count++;
         }
         closedir(dir);
-        if (temp_count > 0) {
-                for (int i = 0; i < temp_count - 1; i++) {
-                        for (int j = i + 1; j < temp_count; j++) {
-                                int swap = 0;
-                                if (temp_is_dir[i] && !temp_is_dir[j]) {
-                                        swap = 0;
-                                } else if (!temp_is_dir[i] && temp_is_dir[j]) {
-                                        swap = 1;
-                                } else {
-                                        swap = strcmp(temp_names[i], temp_names[j]) > 0;
-                                }
-                                if (swap) {
-                                        char *temp_name = temp_names[i];
-                                        temp_names[i] = temp_names[j];
-                                        temp_names[j] = temp_name;
-                                        char *temp_path = temp_paths[i];
-                                        temp_paths[i] = temp_paths[j];
-                                        temp_paths[j] = temp_path;
-                                        int temp_dir = temp_is_dir[i];
-                                        temp_is_dir[i] = temp_is_dir[j];
-                                        temp_is_dir[j] = temp_dir;
-                                        int temp_dep = temp_depth[i];
-                                        temp_depth[i] = temp_depth[j];
-                                        temp_depth[j] = temp_dep;
-                                }
+        if (temp_count == 0) {
+                free(temp_names);
+                free(temp_paths);
+                free(temp_is_dir);
+                free(temp_depth);
+                return;
+        }
+        for (int i = 0; i < temp_count - 1; i++) {
+                for (int j = i + 1; j < temp_count; j++) {
+                        int swap = 0;
+                        if (temp_is_dir[i] && !temp_is_dir[j]) {
+                                swap = 0;
+                        } else if (!temp_is_dir[i] && temp_is_dir[j]) {
+                                swap = 1;
+                        } else {
+                                swap = strcmp(temp_names[i], temp_names[j]) > 0;
+                        }
+                        if (swap) {
+                                char *temp_name = temp_names[i];
+                                temp_names[i] = temp_names[j];
+                                temp_names[j] = temp_name;
+                                char *temp_path = temp_paths[i];
+                                temp_paths[i] = temp_paths[j];
+                                temp_paths[j] = temp_path;
+                                int temp_dir = temp_is_dir[i];
+                                temp_is_dir[i] = temp_is_dir[j];
+                                temp_is_dir[j] = temp_dir;
+                                int temp_dep = temp_depth[i];
+                                temp_depth[i] = temp_depth[j];
+                                temp_depth[j] = temp_dep;
                         }
                 }
-                for (int i = 0; i < temp_count; i++) {
-                        if (num_entries >= entries_capacity) {
-                                entries_capacity = entries_capacity == 0 ? 64 : entries_capacity * 2;
-                                char **new_names = realloc(file_names, sizeof(char *) * entries_capacity);
-                                char **new_paths = realloc(file_paths, sizeof(char *) * entries_capacity);
-                                int *new_is_dir = realloc(file_is_dir, sizeof(int) * entries_capacity);
-                                int *new_depth = realloc(file_depth, sizeof(int) * entries_capacity);
-                                if (!new_names || !new_paths || !new_is_dir || !new_depth) {
-                                        for (int k = 0; k < temp_count; k++) {
-                                                free(temp_names[k]);
-                                                free(temp_paths[k]);
-                                        }
-                                        free(temp_names);
-                                        free(temp_paths);
-                                        free(temp_is_dir);
-                                        free(temp_depth);
-                                        free_file_entries();
-                                        die("realloc");
-                                }
-                                file_names = new_names;
-                                file_paths = new_paths;
-                                file_is_dir = new_is_dir;
-                                file_depth = new_depth;
-                        }
-                        file_names[num_entries] = temp_names[i];
-                        file_paths[num_entries] = temp_paths[i];
-                        file_is_dir[num_entries] = temp_is_dir[i];
-                        file_depth[num_entries] = temp_depth[i];
-                        num_entries++;
+        }
+        for (int i = 0; i < temp_count; i++) {
+                if (num_entries >= entries_capacity) {
+                        entries_capacity = entries_capacity == 0 ? 64 : entries_capacity * 2;
+                        file_names = safe_realloc(file_names, sizeof(char *) * entries_capacity);
+                        file_paths = safe_realloc(file_paths, sizeof(char *) * entries_capacity);
+                        file_is_dir = safe_realloc(file_is_dir, sizeof(int) * entries_capacity);
+                        file_depth = safe_realloc(file_depth, sizeof(int) * entries_capacity);
                 }
+
+                file_names[num_entries] = temp_names[i];
+                file_paths[num_entries] = temp_paths[i];
+                file_is_dir[num_entries] = temp_is_dir[i];
+                file_depth[num_entries] = temp_depth[i];
+                num_entries++;
         }
         free(temp_names);
         free(temp_paths);

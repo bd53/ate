@@ -11,14 +11,19 @@
 #include "efunc.h"
 #include "util.h"
 
-static int read_csi_sequence(void)
+static int read_escape_sequence(void)
 {
+        struct pollfd fds = {.fd = STDIN_FILENO,.events = POLLIN };
+        if (poll(&fds, 1, 10) <= 0)
+                return KEY_ESCAPE;
         char seq[5];
-        if (read(STDIN_FILENO, &seq[0], 1) != 1)
-                return CSI;
-        if (seq[0] == '1') {
-                if (read(STDIN_FILENO, &seq[1], 1) == 1 && seq[1] == ';' && read(STDIN_FILENO, &seq[2], 1) == 1 && seq[2] == '5' && read(STDIN_FILENO, &seq[3], 1) == 1) {
-                        switch (seq[3]) {
+        if (read(STDIN_FILENO, &seq[0], 1) != 1 || seq[0] != '[')
+                return KEY_ESCAPE;
+        if (read(STDIN_FILENO, &seq[1], 1) != 1)
+                return KEY_ESCAPE;
+        if (seq[1] == '1') {
+                if (read(STDIN_FILENO, &seq[2], 1) == 1 && seq[2] == ';' && read(STDIN_FILENO, &seq[3], 1) == 1 && seq[3] == '5' && read(STDIN_FILENO, &seq[4], 1) == 1) {
+                        switch (seq[4]) {
                         case 'A':
                                 return KEY_CTRL_ARROW_UP;
                         case 'B':
@@ -29,9 +34,9 @@ static int read_csi_sequence(void)
                                 return KEY_CTRL_ARROW_LEFT;
                         }
                 }
-                return CSI;
+                return KEY_ESCAPE;
         }
-        switch (seq[0]) {
+        switch (seq[1]) {
         case 'A':
                 return KEY_ARROW_UP;
         case 'B':
@@ -41,61 +46,8 @@ static int read_csi_sequence(void)
         case 'D':
                 return KEY_ARROW_LEFT;
         case '3':
-                if (read(STDIN_FILENO, &seq[1], 1) == 1 && seq[1] == ';') {
-                        if (read(STDIN_FILENO, &seq[2], 1) == 1 && seq[2] == '5' && read(STDIN_FILENO, &seq[3], 1) == 1 && seq[3] == '~')
-                                return KEY_CTRL_BACKSPACE;
-                }
-                break;
-        }
-        return CSI;
-}
-
-static int read_esc_sequence(void)
-{
-        struct pollfd fds;
-        fds.fd = STDIN_FILENO;
-        fds.events = POLLIN;
-        int poll_result = poll(&fds, 1, 10);
-        if (poll_result == 0)
-                return (int) KEY_ESCAPE;
-        if (poll_result == -1)
-                return (int) KEY_ESCAPE;
-        char seq[5];
-        if (read(STDIN_FILENO, &seq[0], 1) != 1)
-                return (int) KEY_ESCAPE;
-        if (seq[0] != '[')
-                return (int) KEY_ESCAPE;
-        if (read(STDIN_FILENO, &seq[1], 1) != 1)
-                return (int) KEY_ESCAPE;
-        if (seq[1] == '1') {
-                if (read(STDIN_FILENO, &seq[2], 1) == 1 && seq[2] == ';' && read(STDIN_FILENO, &seq[3], 1) == 1 && seq[3] == '5' && read(STDIN_FILENO, &seq[4], 1) == 1) {
-                        switch (seq[4]) {
-                        case 'A':
-                                return (int) KEY_CTRL_ARROW_UP;
-                        case 'B':
-                                return (int) KEY_CTRL_ARROW_DOWN;
-                        case 'C':
-                                return (int) KEY_CTRL_ARROW_RIGHT;
-                        case 'D':
-                                return (int) KEY_CTRL_ARROW_LEFT;
-                        }
-                }
-        }
-        switch (seq[1]) {
-        case 'A':
-                return (int) KEY_ARROW_UP;
-        case 'B':
-                return (int) KEY_ARROW_DOWN;
-        case 'C':
-                return (int) KEY_ARROW_RIGHT;
-        case 'D':
-                return (int) KEY_ARROW_LEFT;
-        case '3':
-                if (read(STDIN_FILENO, &seq[2], 1) == 1 && seq[2] == ';') {
-                        if (read(STDIN_FILENO, &seq[3], 1) == 1 && seq[3] == '5' && read(STDIN_FILENO, &seq[4], 1) == 1 && seq[4] == '~') {
-                                return (int) KEY_CTRL_BACKSPACE;
-                        }
-                }
+                if (read(STDIN_FILENO, &seq[2], 1) == 1 && seq[2] == ';' && read(STDIN_FILENO, &seq[3], 1) == 1 && seq[3] == '5' && read(STDIN_FILENO, &seq[4], 1) == 1 && seq[4] == '~')
+                        return KEY_CTRL_BACKSPACE;
                 break;
         }
         return (int) KEY_ESCAPE;
@@ -109,43 +61,45 @@ int input_read_key(void)
                 if (nread == -1 && errno != EAGAIN)
                         die("read");
         }
-        if ((unsigned char) c == (unsigned char) 0x9B) {
-                return read_csi_sequence();
-        }
-        if (c == KEY_ESCAPE) {
-                return read_esc_sequence();
-        }
+        if ((unsigned char) c == 0x9B)
+                return read_escape_sequence();
+        if (c == KEY_ESCAPE)
+                return read_escape_sequence();
         return (int) c;
 }
 
 static void cursor_move(int key)
 {
-        struct Row *row = (Editor.row != NULL && Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) ? &Editor.row[Editor.cursor_y] : NULL;
+        struct Row *row = (Editor.row && Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) ? &Editor.row[Editor.cursor_y] : NULL;
         Editor.found_row = -1;
         Editor.found_col = -1;
         switch (key) {
         case KEY_ARROW_LEFT:
+        case KEY_MOVE_LEFT:
                 if (Editor.cursor_x > 0) {
                         Editor.cursor_x--;
                 } else if (Editor.cursor_y > 0) {
                         Editor.cursor_y--;
-                        if (Editor.row != NULL && Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows)
+                        if (Editor.row && Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows)
                                 Editor.cursor_x = Editor.row[Editor.cursor_y].size;
                 }
                 break;
         case KEY_ARROW_RIGHT:
-                if (row != NULL && Editor.cursor_x < row->size) {
+        case KEY_MOVE_RIGHT:
+                if (row && Editor.cursor_x < row->size) {
                         Editor.cursor_x++;
-                } else if (row != NULL && Editor.cursor_x == row->size && Editor.cursor_y < Editor.buffer_rows - 1) {
+                } else if (row && Editor.cursor_x == row->size && Editor.cursor_y < Editor.buffer_rows - 1) {
                         Editor.cursor_y++;
                         Editor.cursor_x = 0;
                 }
                 break;
         case KEY_ARROW_UP:
+        case KEY_MOVE_UP:
                 if (Editor.cursor_y > 0)
                         Editor.cursor_y--;
                 break;
         case KEY_ARROW_DOWN:
+        case KEY_MOVE_DOWN:
                 if (Editor.cursor_y < Editor.buffer_rows - 1)
                         Editor.cursor_y++;
                 break;
@@ -153,7 +107,7 @@ static void cursor_move(int key)
                 Editor.cursor_x = 0;
                 break;
         case KEY_CTRL_ARROW_RIGHT:
-                if (row != NULL)
+                if (row)
                         Editor.cursor_x = row->size;
                 break;
         case KEY_CTRL_ARROW_UP:
@@ -167,46 +121,27 @@ static void cursor_move(int key)
                         break;
                 }
         }
-        row = (Editor.row != NULL && Editor.buffer_rows > 0 && Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) ? &Editor.row[Editor.cursor_y] : NULL;
-        int len = row != NULL ? row->size : 0;
+        row = (Editor.row && Editor.buffer_rows > 0 && Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) ? &Editor.row[Editor.cursor_y] : NULL;
+        int len = row ? row->size : 0;
         if (Editor.cursor_x > len)
                 Editor.cursor_x = len;
 }
 
-static int translate_key(int key)
-{
-        switch (key) {
-        case KEY_MOVE_LEFT:
-                return KEY_ARROW_LEFT;
-        case KEY_MOVE_DOWN:
-                return KEY_ARROW_DOWN;
-        case KEY_MOVE_UP:
-                return KEY_ARROW_UP;
-        case KEY_MOVE_RIGHT:
-                return KEY_ARROW_RIGHT;
-        default:
-                return key;
-        }
-}
-
 static void handle_quit(void)
 {
-        (void) write(STDOUT_FILENO, "\x1b[2J", 4);
-        (void) write(STDOUT_FILENO, "\x1b[H", 3);
-        free_workspace_search();
+        write(STDOUT_FILENO, "\x1b[2J\x1b[H", 7);
         run_cleanup();
         exit(0);
 }
 
 static void handle_command(char *cmd)
 {
-        char *trimmed_cmd = cmd;
-        while (isspace((unsigned char) *trimmed_cmd))
-                trimmed_cmd++;
-        const struct {
+        while (isspace((unsigned char) *cmd))
+                cmd++;
+        static const struct {
                 const char *name;
                 void (*func)(void);
-        } extra[] = {
+        } commands[] = {
                 { "Ex", toggle_file_tree },
                 { "find", toggle_workspace_find },
                 { "help", display_help },
@@ -214,34 +149,32 @@ static void handle_command(char *cmd)
                 { "checkhealth", check_health },
                 { NULL, NULL }
         };
-        for (int i = 0; extra[i].name; i++) {
-                if (strcmp(trimmed_cmd, extra[i].name) == 0) {
-                        extra[i].func();
+        for (int i = 0; commands[i].name; i++) {
+                if (strcmp(cmd, commands[i].name) == 0) {
+                        commands[i].func();
                         return;
                 }
         }
-        if (strcmp(trimmed_cmd, "q") == 0) {
+        if (strcmp(cmd, "q") == 0) {
                 run_cleanup();
                 Editor.file_tree = Editor.help_view = 0;
                 if (Editor.buffer_rows == 0)
                         append_row("", 0);
                 Editor.cursor_x = Editor.cursor_y = Editor.row_offset = Editor.modified = 0;
                 refresh_screen();
-        } else if (strcmp(trimmed_cmd, "quit") == 0) {
-                write(STDOUT_FILENO, "\x1b[2J\x1b[H", 7);
-                run_cleanup();
-                exit(0);
-        } else if (strcmp(trimmed_cmd, "bd") == 0) {
+        } else if (strcmp(cmd, "quit") == 0) {
+                handle_quit();
+        } else if (strcmp(cmd, "bd") == 0) {
                 if (Editor.file_tree)
                         toggle_file_tree();
-        } else if (strncmp(trimmed_cmd, "w", 1) == 0) {
+        } else if (strncmp(cmd, "w", 1) == 0) {
                 char *arg = NULL;
-                if (strncmp(trimmed_cmd, "w ", 2) == 0) {
-                        arg = trimmed_cmd + 2;
+                if (strncmp(cmd, "w ", 2) == 0) {
+                        arg = cmd + 2;
                         while (isspace((unsigned char) *arg))
                                 arg++;
-                } else if (strncmp(trimmed_cmd, "write ", 6) == 0) {
-                        arg = trimmed_cmd + 6;
+                } else if (strncmp(cmd, "write ", 6) == 0) {
+                        arg = cmd + 6;
                         while (isspace((unsigned char) *arg))
                                 arg++;
                 }
@@ -263,7 +196,7 @@ static void handle_command(char *cmd)
                 save_file();
         } else {
                 char msg[256];
-                snprintf(msg, sizeof(msg), "E182: Not an editor command: '%s'", trimmed_cmd);
+                snprintf(msg, sizeof(msg), "E182: Not an editor command: '%s'", cmd);
                 display_message(2, msg);
                 input_read_key();
                 refresh_screen();
@@ -273,9 +206,7 @@ static void handle_command(char *cmd)
 static void command_mode(void)
 {
         size_t bufsize = 256, buflen = 0;
-        char *buf = malloc(bufsize);
-        if (!buf)
-                die("malloc");
+        char *buf = safe_malloc(bufsize);
         buf[0] = '\0';
         while (1) {
                 if (Editor.cursor_y < Editor.row_offset)
@@ -287,10 +218,7 @@ static void command_mode(void)
                 draw_content(&ab);
                 display_status(&ab);
                 char pos[64];
-                snprintf(pos, sizeof(pos),
-                         "\x1b[%d;1H\x1b[K:%s\x1b[%d;%dH\x1b[?25h",
-                         Editor.editor_rows + 2, buf, Editor.editor_rows + 2,
-                         (int) buflen + 2);
+                snprintf(pos, sizeof(pos), "\x1b[%d;1H\x1b[K:%s\x1b[%d;%dH\x1b[?25h", Editor.editor_rows + 2, buf, Editor.editor_rows + 2, (int) buflen + 2);
                 append(&ab, pos, strlen(pos));
                 if (write(STDOUT_FILENO, ab.b, ab.length) == -1) {
                         free(ab.b);
@@ -317,9 +245,7 @@ static void command_mode(void)
                 } else if (c >= 32 && c < 127) {
                         if (buflen >= bufsize - 1) {
                                 bufsize *= 2;
-                                buf = realloc(buf, bufsize);
-                                if (!buf)
-                                        die("realloc");
+                                buf = safe_realloc(buf, bufsize);
                         }
                         buf[buflen++] = c;
                         buf[buflen] = '\0';
@@ -327,66 +253,38 @@ static void command_mode(void)
         }
 }
 
-static void handle_file_tree(int c)
+static void handle_spec(int c)
 {
+        int is_file_tree = Editor.file_tree;
         switch (c) {
         case KEY_QUIT:
                 handle_quit();
                 break;
         case KEY_TOGGLE_FILE_TREE:
+                toggle_file_tree();
+                return;
         case KEY_ESCAPE:
         case 'q':
-                toggle_file_tree();
+                if (is_file_tree) {
+                        toggle_file_tree();
+                } else {
+                        run_cleanup();
+                        Editor.help_view = 0;
+                        if (Editor.buffer_rows == 0)
+                                append_row("", 0);
+                }
                 return;
         case KEY_COMMAND_MODE:
                 Editor.mode = 2;
                 command_mode();
                 return;
         case KEY_ENTER:
-                open_file_tree();
-                return;
-        case KEY_ARROW_UP:
-        case KEY_ARROW_DOWN:
-        case KEY_ARROW_LEFT:
-        case KEY_ARROW_RIGHT:
-        case KEY_CTRL_ARROW_UP:
-        case KEY_CTRL_ARROW_DOWN:
-        case KEY_CTRL_ARROW_LEFT:
-        case KEY_CTRL_ARROW_RIGHT:
-                cursor_move(c);
-                break;
-        case KEY_MOVE_LEFT:
-        case KEY_MOVE_DOWN:
-        case KEY_MOVE_UP:
-        case KEY_MOVE_RIGHT:
-                cursor_move(translate_key(c));
-                break;
-        }
-        refresh_screen();
-}
-
-static void handle_help(int c)
-{
-        switch (c) {
-        case KEY_QUIT:
-                handle_quit();
-                break;
-        case KEY_ESCAPE:
-        case 'q':
-                run_cleanup();
-                Editor.help_view = 0;
-                if (Editor.buffer_rows == 0)
-                        append_row("", 0);
-                break;
-        case KEY_COMMAND_MODE:
-                Editor.mode = 2;
-                command_mode();
+                if (is_file_tree)
+                        open_file_tree();
                 return;
         case KEY_TOGGLE_HELP:
-                display_help();
-                return;
-        case KEY_TOGGLE_FILE_TREE:
-                toggle_file_tree();
+                if (!is_file_tree)
+                        display_help();
                 return;
         case KEY_ARROW_UP:
         case KEY_ARROW_DOWN:
@@ -396,13 +294,11 @@ static void handle_help(int c)
         case KEY_CTRL_ARROW_DOWN:
         case KEY_CTRL_ARROW_LEFT:
         case KEY_CTRL_ARROW_RIGHT:
-                cursor_move(c);
-                break;
         case KEY_MOVE_LEFT:
         case KEY_MOVE_DOWN:
         case KEY_MOVE_UP:
         case KEY_MOVE_RIGHT:
-                cursor_move(translate_key(c));
+                cursor_move(c);
                 break;
         }
         refresh_screen();
@@ -414,9 +310,7 @@ static void yank_line(void)
                 return;
         struct Row *row = &Editor.row[Editor.cursor_y];
         static const char b64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-        char *encoded = malloc(((row->size + 2) / 3) * 4 + 1);
-        if (!encoded)
-                return;
+        char *encoded = safe_malloc(((row->size + 2) / 3) * 4 + 1);
         int j = 0;
         for (int i = 0; i < row->size; i += 3) {
                 int n = row->chars[i] << 16;
@@ -456,10 +350,8 @@ static void goto_line(void)
         while (isspace((unsigned char) *trimmed))
                 trimmed++;
         char *end = trimmed + strlen(trimmed) - 1;
-        while (end > trimmed && isspace((unsigned char) *end)) {
-                *end = '\0';
-                end--;
-        }
+        while (end > trimmed && isspace((unsigned char) *end))
+                *end-- = '\0';
         char *endptr;
         long line_number = strtol(trimmed, &endptr, 10);
         while (*endptr && isspace((unsigned char) *endptr))
@@ -530,7 +422,15 @@ static void handle_normal_mode(int c)
         case KEY_MOVE_DOWN:
         case KEY_MOVE_UP:
         case KEY_MOVE_RIGHT:
-                cursor_move(translate_key(c));
+        case KEY_ARROW_UP:
+        case KEY_ARROW_DOWN:
+        case KEY_ARROW_LEFT:
+        case KEY_ARROW_RIGHT:
+        case KEY_CTRL_ARROW_UP:
+        case KEY_CTRL_ARROW_DOWN:
+        case KEY_CTRL_ARROW_LEFT:
+        case KEY_CTRL_ARROW_RIGHT:
+                cursor_move(c);
                 break;
         }
 }
@@ -553,11 +453,10 @@ static void auto_dedent(void)
         if (leading >= TAB_SIZE) {
                 int spaces_to_remove = 0;
                 for (int i = 0; i < row->size && i < TAB_SIZE; i++) {
-                        if (row->chars[i] == ' ') {
+                        if (row->chars[i] == ' ')
                                 spaces_to_remove++;
-                        } else {
+                        else
                                 break;
-                        }
                 }
                 if (spaces_to_remove == 0)
                         return;
@@ -595,7 +494,7 @@ static void handle_insert_mode(int c)
                 if (c >= 32 && c < 127) {
                         Editor.modified = 1;
                         insert_character((char) c);
-                        if (c == (int) '}' || c == (int) ')' || c == (int) ']')
+                        if (c == '}' || c == ')' || c == ']')
                                 auto_dedent();
                 }
                 break;
@@ -605,12 +504,8 @@ static void handle_insert_mode(int c)
 void process_keypress(void)
 {
         int c = input_read_key();
-        if (Editor.file_tree != 0) {
-                handle_file_tree(c);
-                return;
-        }
-        if (Editor.help_view != 0) {
-                handle_help(c);
+        if (Editor.file_tree || Editor.help_view) {
+                handle_spec(c);
                 return;
         }
         switch (c) {
@@ -626,11 +521,10 @@ void process_keypress(void)
                         toggle_file_tree();
                 break;
         case KEY_BACKSPACE_ALT:
-                if (Editor.mode == 1) {
+                if (Editor.mode == 1)
                         delete_line();
-                } else if (Editor.mode == 0) {
+                else if (Editor.mode == 0)
                         display_help();
-                }
                 break;
         case KEY_CTRL_BACKSPACE:
                 if (Editor.mode == 1)
@@ -656,11 +550,10 @@ void process_keypress(void)
                 cursor_move(c);
                 break;
         default:
-                if (Editor.mode == 0) {
+                if (Editor.mode == 0)
                         handle_normal_mode(c);
-                } else if (Editor.mode == 1) {
+                else if (Editor.mode == 1)
                         handle_insert_mode(c);
-                }
                 break;
         }
         refresh_screen();

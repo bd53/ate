@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "edef.h"
 #include "efunc.h"
 #include "util.h"
 
@@ -21,26 +22,10 @@ static void add_search_result(const char *filepath, int row, int col, const char
 {
         if (num_results >= capacity) {
                 int new_capacity = capacity == 0 ? 64 : capacity * 2;
-                char **new_filepaths = realloc(filepaths, sizeof(char *) * new_capacity);
-                int *new_rows = realloc(rows, sizeof(int) * new_capacity);
-                int *new_cols = realloc(cols, sizeof(int) * new_capacity);
-                char **new_line_contents = realloc(line_contents, sizeof(char *) * new_capacity);
-                if (!new_filepaths || !new_rows || !new_cols
-                    || !new_line_contents) {
-                        if (new_filepaths && new_filepaths != filepaths)
-                                free(new_filepaths);
-                        if (new_rows && new_rows != rows)
-                                free(new_rows);
-                        if (new_cols && new_cols != cols)
-                                free(new_cols);
-                        if (new_line_contents && new_line_contents != line_contents)
-                                free(new_line_contents);
-                        return;
-                }
-                filepaths = new_filepaths;
-                rows = new_rows;
-                cols = new_cols;
-                line_contents = new_line_contents;
+                filepaths = safe_realloc(filepaths, sizeof(char *) * new_capacity);
+                rows = safe_realloc(rows, sizeof(int) * new_capacity);
+                cols = safe_realloc(cols, sizeof(int) * new_capacity);
+                line_contents = safe_realloc(line_contents, sizeof(char *) * new_capacity);
                 capacity = new_capacity;
         }
         char *fp_copy = strdup(filepath);
@@ -59,20 +44,16 @@ static void add_search_result(const char *filepath, int row, int col, const char
 
 static void collect_and_search_files(const char *dirpath, const char *query, int depth)
 {
-        if (depth > 10)
-                return;
-        if (dirpath == NULL || query == NULL)
+        if (depth > 10 || !dirpath || !query)
                 return;
         DIR *dir = opendir(dirpath);
         if (!dir)
                 return;
         struct dirent *entry;
         while ((entry = readdir(dir)) != NULL) {
-                if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+                if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0 || entry->d_name[0] == '.')
                         continue;
-                if (entry->d_name[0] == '.')
-                        continue;
-                char full_path[2048];
+                char full_path[MAX_PATH_LEN];
                 size_t dirpath_len = strlen(dirpath);
                 size_t name_len = strlen(entry->d_name);
                 if (dirpath_len + name_len + 2 >= sizeof(full_path))
@@ -90,8 +71,7 @@ static void collect_and_search_files(const char *dirpath, const char *query, int
                         if (!fp)
                                 continue;
                         unsigned char buffer[512];
-                        size_t bytes_read =
-                            fread(buffer, 1, sizeof(buffer), fp);
+                        size_t bytes_read = fread(buffer, 1, sizeof(buffer), fp);
                         fclose(fp);
                         int is_binary = 0;
                         for (size_t i = 0; i < bytes_read; i++) {
@@ -120,9 +100,8 @@ static void collect_and_search_files(const char *dirpath, const char *query, int
                                 }
                                 char *pos = line;
                                 while ((pos = strstr(pos, query)) != NULL) {
-                                        int col = (int) (pos - line);
-                                        add_search_result(full_path, row_num,
-                                                          col, line);
+                                        int col = (int)(pos - line);
+                                        add_search_result(full_path, row_num, col, line);
                                         pos++;
                                 }
                                 row_num++;
@@ -164,7 +143,7 @@ static void jump_to_result(int index)
         int result_col = cols[index];
         if (Editor.modified && Editor.filename)
                 save_file();
-        if (Editor.filename == NULL || strcmp(Editor.filename, result_filepath) != 0)
+        if (!Editor.filename || strcmp(Editor.filename, result_filepath) != 0)
                 display_editor(result_filepath);
         if (result_row >= 0 && result_row < Editor.buffer_rows) {
                 Editor.cursor_y = result_row;
@@ -173,27 +152,29 @@ static void jump_to_result(int index)
                 Editor.found_col = result_col;
                 int content_width = Editor.editor_cols - Editor.gutter_width;
                 if (content_width <= 0)
-                        content_width = 80;     // fallback
+                        content_width = 80;
                 if (Editor.cursor_y < Editor.row_offset)
                         Editor.row_offset = Editor.cursor_y;
                 if (Editor.cursor_y >= Editor.row_offset + Editor.editor_rows)
                         Editor.row_offset = Editor.cursor_y - Editor.editor_rows + 1;
-                int wrap_line = Editor.cursor_x / content_width;
-                int screen_rows_before = 0;
-                for (int i = Editor.row_offset;
-                     i < Editor.cursor_y && i < Editor.buffer_rows; i++) {
-                        struct Row *row = &Editor.row[i];
-                        int wrapped_lines = (row->size + content_width - 1) / content_width;
-                        if (wrapped_lines == 0)
-                                wrapped_lines = 1;
-                        screen_rows_before += wrapped_lines;
-                }
-                int total_screen_row = screen_rows_before + wrap_line;
-                if (total_screen_row >= Editor.editor_rows) {
-                        int target_offset = Editor.cursor_y - Editor.editor_rows / 2;
-                        if (target_offset < 0)
-                                target_offset = 0;
-                        Editor.row_offset = target_offset;
+                if (Editor.editor_rows > 0) {
+                        int wrap_line = Editor.cursor_x / content_width;
+                        int screen_rows_before = 0;
+                        for (int i = Editor.row_offset;
+                             i < Editor.cursor_y && i < Editor.buffer_rows; i++) {
+                                struct Row *row = &Editor.row[i];
+                                int wrapped_lines = (row->size + content_width - 1) / content_width;
+                                if (wrapped_lines == 0)
+                                        wrapped_lines = 1;
+                                screen_rows_before += wrapped_lines;
+                        }
+                        int total_screen_row = screen_rows_before + wrap_line;
+                        if (total_screen_row >= Editor.editor_rows) {
+                                int target_offset = Editor.cursor_y - Editor.editor_rows / 2;
+                                if (target_offset < 0)
+                                        target_offset = 0;
+                                Editor.row_offset = target_offset;
+                        }
                 }
         }
         char msg[512];
@@ -205,7 +186,7 @@ static void jump_to_result(int index)
                         display_path = result_filepath + cwd_len + 1;
                 }
         }
-        snprintf(msg, sizeof(msg), "Match %d/%d: %s:%d:%d", index + 1, num_results, display_path, result_row + 1, result_col + 1);
+        snprintf(msg, sizeof(msg), "Match %d/%d: %.*s:%d:%d", index + 1, num_results, MAX_DISPLAY_PATH, display_path, result_row + 1, result_col + 1);
         display_message(1, msg);
 }
 
@@ -213,7 +194,7 @@ void toggle_workspace_find(void)
 {
         free_workspace_search();
         char *query = prompt("Find in workspace: %s (ESC to cancel)");
-        if (query == NULL) {
+        if (!query) {
                 refresh_screen();
                 return;
         }

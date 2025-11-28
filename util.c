@@ -27,6 +27,22 @@ void die(const char *s)
         exit(1);
 }
 
+void *safe_malloc(size_t size)
+{
+        void *ptr = malloc(size);
+        if (!ptr)
+                die("malloc");
+        return ptr;
+}
+
+void *safe_realloc(void *ptr, size_t size)
+{
+        void *new_ptr = realloc(ptr, size);
+        if (!new_ptr)
+                die("realloc");
+        return new_ptr;
+}
+
 int fetch(int *rows, int *cols)
 {
         if (rows == NULL || cols == NULL)

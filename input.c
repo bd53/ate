@@ -12,9 +12,7 @@ char *prompt(const char *prompt)
         if (prompt == NULL)
                 return NULL;
         size_t bufsize = 256;
-        char *buf = malloc(bufsize);
-        if (!buf)
-                die("malloc");
+        char *buf = safe_malloc(bufsize);
         size_t buflen = 0;
         buf[0] = '\0';
         int prompt_row = Editor.editor_rows + 2;
@@ -62,12 +60,7 @@ char *prompt(const char *prompt)
                                 buf[buflen] = '\0';
                         } else {
                                 bufsize *= 2;
-                                char *new_buf = realloc(buf, bufsize);
-                                if (new_buf == NULL) {
-                                        free(buf);
-                                        die("realloc");
-                                }
-                                buf = new_buf;
+                                buf = safe_realloc(buf, bufsize);
                                 buf[buflen++] = c;
                                 buf[buflen] = '\0';
                         }
