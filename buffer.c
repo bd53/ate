@@ -77,10 +77,13 @@ void delete_row(int at)
                 free(Editor.row);
                 Editor.row = NULL;
                 Editor.cursor_y = 0;
+                Editor.cursor_x = 0;
         } else {
                 Editor.row = safe_realloc(Editor.row, sizeof(struct Row) * Editor.buffer_rows);
                 if (Editor.cursor_y >= Editor.buffer_rows)
                         Editor.cursor_y = Editor.buffer_rows - 1;
+                if (Editor.cursor_x > Editor.row[Editor.cursor_y].size)
+                    Editor.cursor_x = Editor.row[Editor.cursor_y].size;
         }
         if (Editor.cursor_y < 0)
                 Editor.cursor_y = 0;
@@ -179,9 +182,7 @@ void delete_character(void)
 {
         if (Editor.cursor_x == 0 && Editor.cursor_y == 0)
                 return;
-        if (Editor.cursor_y >= Editor.buffer_rows)
-                return;
-        if (!Editor.row)
+        if (Editor.cursor_y >= Editor.buffer_rows || !Editor.row)
                 return;
         if (Editor.cursor_x == 0) {
                 if (Editor.cursor_y == 0)
@@ -189,8 +190,10 @@ void delete_character(void)
                 struct Row *prev_row = &Editor.row[Editor.cursor_y - 1];
                 struct Row *current_row = &Editor.row[Editor.cursor_y];
                 int merge_at = prev_row->size;
-                prev_row->chars = safe_realloc(prev_row->chars, prev_row->size + current_row->size + 1);
-                prev_row->state = safe_realloc(prev_row->state, prev_row->size + current_row->size);
+                int new_size = prev_row->size + current_row->size;
+                int new_state_size = new_size > 0 ? new_size : 1;
+                prev_row->chars = safe_realloc(prev_row->chars, new_size + 1);
+                prev_row->state = safe_realloc(prev_row->state, new_state_size);
                 memcpy(&prev_row->chars[merge_at], current_row->chars, current_row->size);
                 memcpy(&prev_row->state[merge_at], current_row->state, current_row->size);
                 prev_row->size = merge_at + current_row->size;
