@@ -1,24 +1,49 @@
 #ifndef EBIND_H
 #define EBIND_H
 
-#define KEY_CTRL_Q 17
-#define KEY_CTRL_S 19
-#define KEY_CTRL_P 16
-#define KEY_CTRL_F 6
-#define KEY_CTRL_G 7
-#define KEY_CTRL_H 8
-#define KEY_CTRL_Y 25
-#define KEY_BACKSPACE 127
-#define KEY_ENTER 13
-#define KEY_ESC 27
-#define KEY_TAB 9
+#define CSI 0x9B
+#define CTRL_KEY(k) ((k) & 0x1f)
 
-#define KEY_ARROW_UP 'A'
-#define KEY_ARROW_DOWN 'B'
-#define KEY_ARROW_RIGHT 'C'
-#define KEY_ARROW_LEFT 'D'
+enum Codes {
+        KEY_ARROW_LEFT = 1004,
+        KEY_ARROW_RIGHT = 1005,
+        KEY_ARROW_UP = 1002,
+        KEY_ARROW_DOWN = 1003,
+        KEY_CTRL_ARROW_LEFT = 1000,
+        KEY_CTRL_ARROW_RIGHT = 1001,
+        KEY_CTRL_ARROW_UP = 1006,
+        KEY_CTRL_ARROW_DOWN = 1007,
+        KEY_CTRL_BACKSPACE = 1008
+};
 
-int process_keypress(char c);
-int read_esc_sequence(void);
+/* universal */
+#define KEY_QUIT CTRL_KEY('q')
+#define KEY_ESCAPE '\x1b'
+#define KEY_ENTER '\r'
+
+/* normal mode */
+/* navigation */
+#define KEY_MOVE_LEFT 'h'
+#define KEY_MOVE_DOWN 'j'
+#define KEY_MOVE_UP 'k'
+#define KEY_MOVE_RIGHT 'l'
+#define KEY_INSERT_MODE 'i'
+#define KEY_COMMAND_MODE ':'
+#define KEY_OPEN_FILE CTRL_KEY('o')
+#define KEY_SAVE_FILE CTRL_KEY('s')
+#define KEY_TOGGLE_HELP CTRL_KEY('h')
+#define KEY_TOGGLE_FIND CTRL_KEY('f')
+#define KEY_TOGGLE_TAGS CTRL_KEY('y')
+#define KEY_TOGGLE_FILE_TREE CTRL_KEY('p')
+#define KEY_FIND_NEXT 'n'
+#define KEY_FIND_PREV 'b'
+#define KEY_YANK_LINE 'y'
+#define KEY_DELETE_LINE 'd'
+#define KEY_GO_TO_LINE CTRL_KEY('g')
+
+/* insert mode */
+#define KEY_BACKSPACE_ASCII 127
+#define KEY_BACKSPACE_ALT 8
+#define KEY_TAB '\t'
 
 #endif

@@ -2,19 +2,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 #include "ebind.h"
 #include "efunc.h"
-#include "estruct.h"
-#include "search.h"
 #include "util.h"
 #include "version.h"
 
 static void usage(void)
 {
         printf("%s --version | output version information\n", PROGRAM_NAME);
-        printf("%s --help    | display this help\n", PROGRAM_NAME);
+        printf("%s --help    | display this help or view more information in the editor using :help\n", PROGRAM_NAME);
         exit(0);
 }
 
@@ -30,59 +27,17 @@ int main(int argc, char *argv[])
                         usage();
                 }
         }
-        ttopen();
-        editor.lines = malloc(sizeof(char *));
-        editor.lines[0] = strdup("");
-        editor.line_numbers = 1;
-        editor.cursor_x = 0;
-        editor.cursor_y = 0;
-        editor.offset_y = 0;
-        editor.filename = NULL;
-        editor.modified = 0;
-        if (argc >= 2) {
-                browse_mode = 0;
-                load_file(argv[1]);
-        } else {
-                browse_mode = 1;
-                init_filetree(".");
-        }
+        ttopen(true);
+        if (argc >= 2)
+                display_editor(argv[1]);
+        if (fetch(&Editor.editor_rows, &Editor.editor_cols) == -1)
+                die("fetch");
+        Editor.editor_rows -= 2;
+        if (Editor.buffer_rows == 0)
+                append_row("", 0);
         while (1) {
-                if (goto_mode) {
-                        render_goto_interface();
-                } else if (help_mode) {
-                        render_help();
-                } else if (tags_mode) {
-                        render_tags();
-                } else if (search_mode) {
-                        render_search_interface();
-                } else if (browse_mode) {
-                        render_filetree();
-                } else {
-                        refresh();
-                }
-                char c;
-                if (read(STDIN_FILENO, &c, 1) != 1)
-                        continue;
-                if (!process_keypress(c)) {
-                        break;
-                }
+                refresh_screen();
+                process_keypress();
         }
-        if (goto_mode) {
-                free_goto();
-        }
-        if (search_mode) {
-                free_search();
-        }
-        if (browse_mode) {
-                free_filetree();
-        }
-        cleanup_help();
-        cleanup_tags();
-        for (int i = 0; i < editor.line_numbers; i++) {
-                free(editor.lines[i]);
-        }
-        free(editor.lines);
-        free(editor.filename);
-        ttclose();
         return 0;
 }

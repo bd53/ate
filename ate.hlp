@@ -1,15 +1,34 @@
 ate.hlp         ate
                                 ATE - help
 
-      Move around:   Use the cursor keys.
-Close this window:   Use "esc".
-   Get out of ate:   Use "ctrl+q" (careful, all changes are lost!)
+      Move around:   Use the cursor keys, or "h" to go left,
+                     "j" to go down, "k" to go up, "l" to go right.
+Close this window:   Use ":q<Enter>".
+   Get out of ate:   Use "ctrl+q" or ":quit<enter>" (careful, all changes are lost!)
 
 Jump to a subject:   Type CTRL+ARROWKEYS. Repeat to go where you want.
      Jump to line:   Use CTRL+G in current buffer.
+
+    Deleting text:   Delete the characters under the cursor with "d" until the
+                     end of the line.
+Copy to clipboard:   Use "y" to yank the characters under the cursor.
 
 Explore directory:   Use CTRL+P, then <enter> to view contents of a directory
                      or file.
 
   Find in project:   With CTRL+F you're able to query a search through your entire
-                     project workspace.
+                     project workspace. Use "n" to find next, and "b" to go back.
+     Quick search:   Using CTRL+O you can quickly open a file of choice by name.
+
+==============================================================================
+ATE COMMANDS
+
+------------------------------------------------------------------------------
+:help                Displays this help
+:checkhealth         Run editor health check
+:w or :write         Save file (if file doesn't exist yet, you'll be prompted to save it as one)
+:Ex and :bd          Toggle default file tree
+:find                Search for text through all buffers
+:tags                Display ctags (must be generated via "make tags")
+:q                   Closes current buffer
+:quit                Quit editor

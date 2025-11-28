@@ -1,173 +1,192 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <sys/ioctl.h>
-#include <termios.h>
 #include <unistd.h>
 
-#include "edef.h"
+#include "ebind.h"
 #include "efunc.h"
-#include "estruct.h"
 #include "util.h"
-#include "version.h"
 
-int char_display_width(char c, int col_pos)
+static void reset_editor_state(char *filename)
 {
-        if (c == '\t') {
-                return TAB_SIZE - (col_pos % TAB_SIZE);
+        free_rows();
+        free_file_entries();
+        if (Editor.query) {
+                free(Editor.query);
+                Editor.query = NULL;
         }
-        return 1;
+        if (Editor.filename) {
+                free(Editor.filename);
+        }
+        Editor.filename = filename;
+        Editor.help_view = 0;
+        Editor.file_tree = 0;
+        Editor.tag_view = 0;
 }
 
-void buffer_to_screen_pos(int line_idx, int cursor_x, int screen_width, int *screen_line, int *screen_col)
+void refresh_screen(void)
 {
-        if (line_idx < 0 || line_idx >= editor.line_numbers) {
-                *screen_line = 0;
-                *screen_col = 0;
-                return;
-        }
-        char *line = editor.lines[line_idx];
-        int len = strlen(line);
-        int col = 0;
-        int wrapped_lines = 0;
-        for (int i = 0; i < cursor_x && i < len; i++) {
-                int char_width = char_display_width(line[i], col);
-                if (col + char_width > screen_width) {
-                        wrapped_lines++;
-                        col = 0;
-                }
-                col += char_width;
-        }
-        *screen_line = wrapped_lines;
-        *screen_col = col;
-}
-
-int get_wrapped_line_count(int line_idx, int screen_width)
-{
-        if (line_idx < 0 || line_idx >= editor.line_numbers) {
-                return 1;
-        }
-        char *line = editor.lines[line_idx];
-        int len = strlen(line);
-        if (len == 0) {
-                return 1;
-        }
-        int col = 0;
-        int wrapped_lines = 1;
-        for (int i = 0; i < len; i++) {
-                int char_width = char_display_width(line[i], col);
-                if (col + char_width > screen_width) {
-                        wrapped_lines++;
-                        col = 0;
-                }
-                col += char_width;
-        }
-        return wrapped_lines;
-}
-
-void refresh()
-{
-        printf("\x1b[2J");
-        printf("\x1b[H");
-        int rows = get_window_rows() - 2;
-        int total_cols = get_window_cols();
-        int cols = total_cols - LINE_NUMBER_WIDTH;
-        printf("\x1b[7m");
-        char top_status[256];
-        snprintf(top_status, sizeof(top_status), " %s %s", PROGRAM_NAME_LONG, VERSION);
-        printf("%s", top_status);
-        int top_status_len = strlen(top_status);
-        for (int i = top_status_len; i < total_cols; i++) {
-                printf(" ");
-        }
-        printf("\x1b[m\r\n");
-        int cursor_screen_row = -1;
-        int cursor_screen_col = 0;
-        int current_screen_row = 0;
-        for (int i = editor.offset_y;
-             i < editor.line_numbers && current_screen_row < rows; i++) {
-                char line_num_str[LINE_NUMBER_WIDTH + 1];
-                snprintf(line_num_str, sizeof(line_num_str), "%*d ", LINE_NUMBER_WIDTH - 1, i + 1);
-                printf("\x1b[38;5;242m");
-                printf("%s", line_num_str);
-                printf("\x1b[m");
-                if (i == editor.cursor_y) {
-                    cursor_screen_col = LINE_NUMBER_WIDTH;
-                }
-                char *line = editor.lines[i];
-                int len = strlen(line);
-                int col = 0;
-                int line_row_offset = 0;
-                int is_cursor_line = (i == editor.cursor_y);
-                int cursor_found = 0;
-                for (int j = 0; j < len; j++) {
-                        char c = line[j];
-                        int char_width = char_display_width(c, col);
-                        if (col + char_width > cols) {
-                                printf("\x1b[K\r\n");
-                                line_row_offset++;
-                                current_screen_row++;
-                                col = 0;
-                                if (current_screen_row >= rows) {
-                                        break;
-                                }
-                                printf("\x1b[38;5;242m");
-                                printf("%*s", LINE_NUMBER_WIDTH, "");
-                                printf("\x1b[m");
-                        }
-                        if (is_cursor_line && j == editor.cursor_x && !cursor_found) {
-                                cursor_screen_row = current_screen_row;
-                                cursor_screen_col = col + LINE_NUMBER_WIDTH;
-                                cursor_found = 1;
-                        }
-                        if (c == '\t') {
-                                int tab_width = TAB_SIZE - (col % TAB_SIZE);
-                                for (int k = 0; k < tab_width; k++) {
-                                        printf(" ");
-                                }
-                                col += tab_width;
-                        } else {
-                                printf("%c", c);
-                                col++;
-                        }
-                }
-                if (is_cursor_line && editor.cursor_x >= len && !cursor_found) {
-                        cursor_screen_row = current_screen_row;
-                        cursor_screen_col = col + LINE_NUMBER_WIDTH;
-                }
-                printf("\x1b[K\r\n");
-                current_screen_row++;
-        }
-        while (current_screen_row < rows) {
-                printf("\x1b[38;5;242m");
-                printf("~");
-                printf("\x1b[m");
-                printf("\x1b[K\r\n");
-                current_screen_row++;
-        }
-        printf("\x1b[7m");
-        char bottom_status[2048];
-        char cwd[1024];
-        if (getcwd(cwd, sizeof(cwd)) != NULL) {
-                snprintf(bottom_status, sizeof(bottom_status),
-                         " %s | %s %s | Line %d/%d, Col %d", cwd,
-                         editor.filename ? strrchr(editor.filename, '/') ? strrchr(editor.filename, '/') + 1 : editor.filename : "[No Name]",
-                         editor.modified ? "[+]" : "", editor.cursor_y + 1,
-                         editor.line_numbers, editor.cursor_x + 1);
+        if (Editor.cursor_y < Editor.row_offset)
+                Editor.row_offset = Editor.cursor_y;
+        if (Editor.cursor_y >= Editor.row_offset + Editor.editor_rows)
+                Editor.row_offset = Editor.cursor_y - Editor.editor_rows + 1;
+        struct Buffer ab = BUFFER_INIT;
+        append(&ab, "\x1b[?25l\x1b[H", 9);
+        draw_content(&ab);
+        display_status(&ab);
+        Editor.gutter_width = calculate();
+        int content_width = Editor.editor_cols - Editor.gutter_width;
+        if (Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) {
+                struct Row *row = &Editor.row[Editor.cursor_y];
+                if (Editor.cursor_x > row->size)
+                        Editor.cursor_x = row->size;
+                if (Editor.cursor_x < 0)
+                        Editor.cursor_x = 0;
         } else {
-                snprintf(bottom_status, sizeof(bottom_status),
-                         " %s %s | Line %d/%d, Col %d",
-                         editor.filename ? editor.filename : "[No Name]",
-                         editor.modified ? "[+]" : "", editor.cursor_y + 1,
-                         editor.line_numbers, editor.cursor_x + 1);
+                Editor.cursor_x = 0;
+                Editor.cursor_y = 0;
         }
-        printf("%s", bottom_status);
-        int bottom_status_len = strlen(bottom_status);
-        for (int i = bottom_status_len; i < total_cols; i++) {
-                printf(" ");
+        int screen_row = 0;
+        for (int filerow = Editor.row_offset;
+             filerow < Editor.cursor_y && filerow < Editor.buffer_rows;
+             filerow++) {
+                int wrapped = (Editor.row[filerow].size + content_width - 1) / content_width;
+                screen_row += wrapped > 0 ? wrapped : 1;
         }
-        printf("\x1b[m");
-        if (cursor_screen_row >= 0) {
-                printf("\x1b[%d;%dH", cursor_screen_row + 2, cursor_screen_col + 1);
+        int cur_x = 1, cur_y = screen_row + 1;
+        if (Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) {
+                int wrap_index = Editor.cursor_x / content_width;
+                screen_row += wrap_index;
+                int col_in_wrap = Editor.cursor_x % content_width;
+                cur_x = col_in_wrap + Editor.gutter_width + 1;
+                cur_y = screen_row + 1;
         }
-        fflush(stdout);
+        char buf[64];
+        snprintf(buf, sizeof(buf), "\x1b[%d;%dH%s\x1b[?25h", cur_y, cur_x, Editor.mode == 1 ? "\x1b[5 q" : "\x1b[2 q");
+        append(&ab, buf, strlen(buf));
+        if (write(STDOUT_FILENO, ab.b, ab.length) == -1)
+                die("write");
+        free(ab.b);
+}
+
+int display_editor(char *filename)
+{
+        if (filename == NULL)
+                return -1;
+        char *new_filename = strdup(filename);
+        if (new_filename == NULL)
+                die("strdup");
+        FILE *fp = fopen(filename, "r");
+        if (!fp) {
+                reset_editor_state(new_filename);
+                append_row("", 0);
+                return -1;
+        }
+        reset_editor_state(new_filename);
+        char *line = NULL;
+        size_t linecap = 0;
+        ssize_t linelen;
+        while ((linelen = getline(&line, &linecap, fp)) != -1) {
+                while (linelen > 0 && (line[linelen - 1] == '\n' || line[linelen - 1] == '\r'))
+                        linelen--;
+                append_row(line, linelen);
+        }
+        free(line);
+        fclose(fp);
+        return 0;
+}
+
+void display_help(void)
+{
+        if (Editor.help_view) {
+                run_cleanup();
+                Editor.help_view = 0;
+                if (Editor.buffer_rows == 0)
+                        append_row("", 0);
+        } else {
+                run_cleanup();
+                display_editor("ate.hlp");
+                if (Editor.buffer_rows == 0)
+                        append_row("", 0);
+                Editor.help_view = 1;
+        }
+        refresh_screen();
+}
+
+void display_tags(void)
+{
+        if (Editor.tag_view) {
+                run_cleanup();
+                Editor.tag_view = 0;
+                if (Editor.buffer_rows == 0)
+                        append_row("", 0);
+        } else {
+                if (access("tags", F_OK) != 0) {
+                        display_message(2, "No tags file found");
+                        return;
+                }
+                run_cleanup();
+                display_editor("tags");
+                if (Editor.buffer_rows == 0)
+                        append_row("", 0);
+                Editor.tag_view = 1;
+        }
+        refresh_screen();
+}
+
+void display_status(struct Buffer *ab)
+{
+        if (ab == NULL)
+                return;
+        append(ab, "\x1b[7m", 4);
+        char status[80];
+        const char *filetype_name = "[No Name]";
+        if (Editor.filename) {
+                char *dot = strrchr(Editor.filename, '.');
+                if (dot != NULL && dot[1] != '\0') {
+                        filetype_name = dot + 1;
+                }
+        }
+        char filename_status[64];
+        if (Editor.file_tree) {
+                snprintf(filename_status, sizeof(filename_status), "netft");
+        } else {
+                snprintf(filename_status, sizeof(filename_status), "%s%s", Editor.filename ? Editor.filename : "[No Name]", Editor.modified ? " *" : "");
+        }
+        const char *mode_str;
+        if (Editor.mode == 0)
+                mode_str = "NORMAL";
+        else if (Editor.mode == 1)
+                mode_str = "INSERT";
+        else if (Editor.mode == 2)
+                mode_str = "COMMAND";
+        else
+                mode_str = "UNKNOWN";
+        int percentage = (Editor.buffer_rows > 0) ? (int) (((float) (Editor.cursor_y + 1) / Editor.buffer_rows) * 100) : 100;
+        int len = snprintf(status, sizeof(status), " %s | %s | R:%d L:%d (%d%%)", mode_str, filename_status, Editor.cursor_y + 1, Editor.buffer_rows > 0 ? Editor.buffer_rows : 1, percentage);
+        if (len > Editor.editor_cols)
+                len = Editor.editor_cols;
+        append(ab, status, len);
+        char rstatus[80];
+        int rlen = snprintf(rstatus, sizeof(rstatus), " %s | C:%d ", filetype_name, Editor.cursor_x + 1);
+        while (len < Editor.editor_cols - rlen) {
+                append(ab, " ", 1);
+                len++;
+        }
+        append(ab, rstatus, rlen);
+        append(ab, "\x1b[m", 3);
+        append(ab, "\r\n", 2);
+}
+
+void display_message(int type, const char *message)
+{
+        const char *color = (type == 1) ? "\x1b[32m" : "\x1b[31m";
+        int prompt_row = Editor.editor_rows + 2;
+        char pos_buf[32];
+        snprintf(pos_buf, sizeof(pos_buf), "\x1b[%d;1H", prompt_row);
+        write(STDOUT_FILENO, pos_buf, strlen(pos_buf));
+        write(STDOUT_FILENO, "\x1b[K", 3);
+        write(STDOUT_FILENO, color, strlen(color));
+        write(STDOUT_FILENO, message, strlen(message));
+        write(STDOUT_FILENO, "\x1b[0m", 4);
 }

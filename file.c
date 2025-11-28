@@ -1,54 +1,57 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
-#include "estruct.h"
+#include "efunc.h"
+#include "util.h"
 
-void load_file(const char *filename)
+void save_file(void)
 {
-        FILE *fp = fopen(filename, "r");
-        if (!fp) {
+        if (Editor.filename == NULL) {
+                char *filename = prompt("Save as: %s (ESC to cancel)");
+                if (filename == NULL) {
+                        refresh_screen();
+                        return;
+                }
+                if (Editor.filename)
+                        free(Editor.filename);
+                Editor.filename = filename;
+        }
+        FILE *fp = fopen(Editor.filename, "w");
+        if (fp == NULL) {
+                refresh_screen();
                 return;
         }
-        for (int i = 0; i < editor.line_numbers; i++) {
-                free(editor.lines[i]);
+        for (int i = 0; i < Editor.buffer_rows; i++) {
+                fwrite(Editor.row[i].chars, 1, Editor.row[i].size, fp);
+                fputc('\n', fp);
         }
-        free(editor.lines);
-        editor.lines = NULL;
-        editor.line_numbers = 0;
-        char *line = NULL;
-        size_t cap = 0;
-        ssize_t len;
-        while ((len = getline(&line, &cap, fp)) != -1) {
-                if (len > 0 && line[len - 1] == '\n') {
-                        line[len - 1] = '\0';
-                }
-                editor.lines = realloc(editor.lines, sizeof(char *) * (editor.line_numbers + 1));
-                editor.lines[editor.line_numbers++] = strdup(line);
+        if (fclose(fp) == EOF) {
+                refresh_screen();
+                return;
         }
-        free(line);
-        fclose(fp);
-        if (editor.line_numbers == 0) {
-                editor.lines = malloc(sizeof(char *));
-                editor.lines[0] = strdup("");
-                editor.line_numbers = 1;
-        }
-        editor.filename = strdup(filename);
+        Editor.modified = 0;
+        refresh_screen();
 }
 
-int save_file()
+void open_file(void)
 {
-        if (!editor.filename) {
-                return 0;
+        char *filename = prompt("Open file: %s (ESC to cancel)");
+        if (!filename) {
+                refresh_screen();
+                return;
         }
-        FILE *fp = fopen(editor.filename, "w");
-        if (!fp) {
-                return 0;
-        }
-        for (int i = 0; i < editor.line_numbers; i++) {
-                fprintf(fp, "%s\n", editor.lines[i]);
-        }
-        fclose(fp);
-        editor.modified = 0;
-        return 1;
+        if (Editor.file_tree)
+                free_file_entries();
+        Editor.file_tree = 0;
+        Editor.help_view = 0;
+        display_editor(filename);
+        free(filename);
+        if (Editor.buffer_rows == 0)
+                append_row("", 0);
+        Editor.cursor_x = 0;
+        Editor.cursor_y = 0;
+        Editor.row_offset = 0;
+        refresh_screen();
 }

@@ -13,13 +13,14 @@ void ttclose()
 {
         printf("\x1b[?1049l");
         fflush(stdout);
-        tcsetattr(0, TCSADRAIN, &original);
+        tcsetattr(0, TCSADRAIN, &Editor.original);
 }
 
 void ttopen()
 {
-        tcgetattr(0, &original);
-        struct termios raw = original;
+        tcgetattr(0, &Editor.original);
+        atexit(ttclose);
+        struct termios raw = Editor.original;
         raw.c_iflag &= ~(IGNBRK | BRKINT | IGNPAR | PARMRK | INPCK | INLCR | IGNCR | ICRNL | IXON);
         raw.c_oflag &= ~(OPOST | ONLCR | OLCUC | OCRNL | ONOCR | ONLRET);
         raw.c_cflag |= ~(ISIG | ICANON | XCASE | ECHO | ECHOE | ECHOK | ECHONL | NOFLSH | TOSTOP | ECHOCTL | ECHOPRT | ECHOKE | FLUSHO | PENDIN | IEXTEN);

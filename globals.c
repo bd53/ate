@@ -2,30 +2,22 @@
 
 #include "estruct.h"
 
-struct termios original;
-
-struct EditorState editor = {
-        .lines = NULL,
-        .line_numbers = 0,
+struct State Editor = {
         .cursor_x = 0,
         .cursor_y = 0,
-        .offset_y = 0,
+        .row_offset = 0,
+        .buffer_rows = 0,
+        .row = NULL,
+        .editor_rows = 0,
+        .editor_cols = 0,
+        .gutter_width = 0,
+        .mode = 0,
+        .query = NULL,
+        .found_row = -1,
+        .found_col = -1,
         .filename = NULL,
-        .modified = 0
+        .modified = 0,
+        .help_view = 0,
+        .file_tree = 0,
+        .tag_view = 0
 };
-
-struct FileTree filetree = {
-        .entries = NULL,
-        .entry_count = 0,
-        .selected_index = 0,
-        .offset = 0,
-        .current_path = NULL
-};
-
-int browse_mode = 0;
-int search_mode = 0;
-struct SearchState search_state = { 0 };
-int help_mode = 0;
-struct GotoState goto_state;
-int goto_mode = 0;
-int tags_mode = 0;
