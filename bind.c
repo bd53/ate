@@ -134,111 +134,46 @@ static void handle_quit(void)
         exit(0);
 }
 
-static void handle_help(void)
-{
-        if (Editor.help_view) {
-                run_cleanup();
-                Editor.help_view = 0;
-                if (Editor.buffer_rows == 0)
-                        append_row("", 0);
-        } else {
-                run_cleanup();
-                init("ate.hlp");
-                if (Editor.buffer_rows == 0)
-                        append_row("", 0);
-                Editor.help_view = 1;
-        }
-        refresh();
-}
+typedef enum {
+        VIEW_TYPE_HELP,
+        VIEW_TYPE_TAGS
+} ViewType;
 
-static void handle_tags(void)
+static void handle_view_toggle(ViewType type)
 {
-        if (Editor.tag_view) {
+        char *filename;
+        int *view_flag;
+        int *other_view_flag;
+        char *error_msg;
+        if (type == VIEW_TYPE_HELP) {
+                filename = "ate.hlp";
+                view_flag = &Editor.help_view;
+                other_view_flag = &Editor.tag_view;
+                error_msg = NULL;
+        } else {
+                filename = "tags";
+                view_flag = &Editor.tag_view;
+                other_view_flag = &Editor.help_view;
+                error_msg = "No tags file found";
+        }
+        if (*view_flag) {
                 run_cleanup();
-                Editor.tag_view = 0;
+                *view_flag = 0;
                 if (Editor.buffer_rows == 0)
                         append_row("", 0);
         } else {
-                if (access("tags", F_OK) != 0) {
-                        notify(2, "No tags file found");
+                if (type == VIEW_TYPE_TAGS && access(filename, F_OK) != 0) {
+                        notify(2, error_msg);
                         return;
                 }
                 run_cleanup();
-                init("tags");
+                *other_view_flag = 0;
+                init(filename);
                 if (Editor.buffer_rows == 0)
                         append_row("", 0);
-                Editor.tag_view = 1;
+                *view_flag = 1;
         }
         refresh();
-}
-
-static void handle_command(char *cmd)
-{
-        while (isspace((unsigned char) *cmd))
-                cmd++;
-        static const struct {
-                const char *name;
-                void (*func)(void);
-        } commands[] = {
-                { "Ex", toggle_file_tree },
-                { "find", toggle_workspace_find },
-                { "help", handle_help },
-                { "tags", handle_tags },
-                { "checkhealth", check_health },
-                { NULL, NULL }
-        };
-        for (int i = 0; commands[i].name; i++) {
-                if (strcmp(cmd, commands[i].name) == 0) {
-                        commands[i].func();
-                        return;
-                }
-        }
-        if (strcmp(cmd, "q") == 0) {
-                run_cleanup();
-                Editor.file_tree = Editor.help_view = 0;
-                if (Editor.buffer_rows == 0)
-                        append_row("", 0);
-                Editor.cursor_x = Editor.cursor_y = Editor.row_offset = Editor.modified = 0;
-                refresh();
-        } else if (strcmp(cmd, "quit") == 0) {
-                handle_quit();
-        } else if (strcmp(cmd, "bd") == 0) {
-                if (Editor.file_tree)
-                        toggle_file_tree();
-        } else if (strncmp(cmd, "w", 1) == 0) {
-                char *arg = NULL;
-                if (strncmp(cmd, "w ", 2) == 0) {
-                        arg = cmd + 2;
-                        while (isspace((unsigned char) *arg))
-                                arg++;
-                } else if (strncmp(cmd, "write ", 6) == 0) {
-                        arg = cmd + 6;
-                        while (isspace((unsigned char) *arg))
-                                arg++;
-                }
-                if (arg && *arg) {
-                        if (Editor.filename)
-                                free(Editor.filename);
-                        Editor.filename = strdup(arg);
-                        if (!Editor.filename)
-                                die("strdup");
-                }
-                if (!Editor.filename) {
-                        char *filename = prompt("Save as: %s (ESC to cancel)");
-                        if (!filename) {
-                                refresh();
-                                return;
-                        }
-                        Editor.filename = filename;
-                }
-                save_file();
-        } else {
-                char msg[256];
-                snprintf(msg, sizeof(msg), "E182: Not an editor command: '%s'", cmd);
-                notify(2, msg);
-                input_read_key();
-                refresh();
-        }
 }
 
 static void command_mode(void)
@@ -266,8 +201,86 @@ static void command_mode(void)
                 free(ab.b);
                 int c = input_read_key();
                 if (c == '\r') {
-                        if (buflen > 0)
-                                handle_command(buf);
+                        if (buflen > 0) {
+                                char *cmd = buf;
+                                while (isspace((unsigned char) *cmd))
+                                        cmd++;
+                                static const struct {
+                                        const char *name;
+                                        void (*func)(void);
+                                } commands[] = {
+                                        { "Ex", toggle_file_tree },
+                                        { "find", toggle_workspace_find },
+                                        { "checkhealth", check_health },
+                                        { NULL, NULL }
+                                };
+                                int handled = 0;
+                                for (int i = 0; commands[i].name; i++) {
+                                        if (strcmp(cmd, commands[i].name) == 0) {
+                                                commands[i].func();
+                                                handled = 1;
+                                                break;
+                                        }
+                                }
+                                if (!handled) {
+                                        if (strcmp(cmd, "help") == 0) {
+                                                handle_view_toggle
+                                                    (VIEW_TYPE_HELP);
+                                        } else if (strcmp(cmd, "tags") == 0) {
+                                                handle_view_toggle
+                                                    (VIEW_TYPE_TAGS);
+                                        } else if (strcmp(cmd, "q") == 0) {
+                                                run_cleanup();
+                                                Editor.file_tree = Editor.help_view = 0;
+                                                if (Editor.buffer_rows == 0)
+                                                        append_row("", 0);
+                                                Editor.cursor_x = Editor.cursor_y = Editor.row_offset = Editor.modified = 0;
+                                                refresh();
+                                        } else if (strcmp(cmd, "quit") == 0) {
+                                                handle_quit();
+                                        } else if (strcmp(cmd, "bd") == 0) {
+                                                if (Editor.file_tree)
+                                                        toggle_file_tree();
+                                        } else if (strncmp(cmd, "w", 1) == 0) {
+                                                char *arg = NULL;
+                                                if (strncmp(cmd, "w ", 2) == 0) {
+                                                        arg = cmd + 2;
+                                                        while (isspace((unsigned char) *arg))
+                                                                arg++;
+                                                } else
+                                                    if (strncmp
+                                                        (cmd, "write ", 6) == 0) {
+                                                        arg = cmd + 6;
+                                                        while (isspace((unsigned char) *arg))
+                                                                arg++;
+                                                }
+                                                if (arg && *arg) {
+                                                        if (Editor.filename)
+                                                                free(Editor.filename);
+                                                        Editor.filename = strdup(arg);
+                                                        if (!Editor.filename)
+                                                                die("strdup");
+                                                }
+                                                if (!Editor.filename) {
+                                                        char *filename = prompt("Save as: %s (ESC to cancel)");
+                                                        if (!filename) {
+                                                                refresh();
+                                                                Editor.mode = 0;
+                                                                free(buf);
+                                                                return;
+                                                        }
+                                                        Editor.filename = filename;
+                                                }
+                                                save_file();
+                                        } else {
+                                                char msg[256];
+                                                snprintf(msg, sizeof(msg), "E182: Not an editor command: '%s'", cmd);
+                                                notify(2, msg);
+                                                input_read_key();
+                                                refresh();
+                                        }
+                                }
+                        }
                         Editor.mode = 0;
                         free(buf);
                         refresh();
@@ -291,82 +304,6 @@ static void command_mode(void)
         }
 }
 
-static void handle_spec(int c)
-{
-        int is_file_tree = Editor.file_tree;
-        switch (c) {
-        case KEY_QUIT:
-                handle_quit();
-                break;
-        case KEY_TOGGLE_FILE_TREE:
-                toggle_file_tree();
-                return;
-        case KEY_ESCAPE:
-        case 'q':
-                if (is_file_tree) {
-                        toggle_file_tree();
-                } else {
-                        run_cleanup();
-                        Editor.help_view = 0;
-                        if (Editor.buffer_rows == 0)
-                                append_row("", 0);
-                }
-                return;
-        case KEY_COMMAND_MODE:
-                Editor.mode = 2;
-                command_mode();
-                return;
-        case KEY_ENTER:
-                if (is_file_tree)
-                        open_file_tree();
-                return;
-        case KEY_TOGGLE_HELP:
-                if (!is_file_tree)
-                        handle_help();
-                return;
-        case KEY_ARROW_UP:
-        case KEY_ARROW_DOWN:
-        case KEY_ARROW_LEFT:
-        case KEY_ARROW_RIGHT:
-        case KEY_CTRL_ARROW_UP:
-        case KEY_CTRL_ARROW_DOWN:
-        case KEY_CTRL_ARROW_LEFT:
-        case KEY_CTRL_ARROW_RIGHT:
-        case KEY_MOVE_LEFT:
-        case KEY_MOVE_DOWN:
-        case KEY_MOVE_UP:
-        case KEY_MOVE_RIGHT:
-                cursor_move(c);
-                break;
-        }
-        refresh();
-}
-
-static void yank_line(void)
-{
-        if (Editor.cursor_y < 0 || Editor.cursor_y >= Editor.buffer_rows)
-                return;
-        struct Row *row = &Editor.row[Editor.cursor_y];
-        static const char b64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-        char *encoded = safe_malloc(((row->size + 2) / 3) * 4 + 1);
-        int j = 0;
-        for (int i = 0; i < row->size; i += 3) {
-                int n = row->chars[i] << 16;
-                if (i + 1 < row->size)
-                        n |= row->chars[i + 1] << 8;
-                if (i + 2 < row->size)
-                        n |= row->chars[i + 2];
-                encoded[j++] = b64[(n >> 18) & 63];
-                encoded[j++] = b64[(n >> 12) & 63];
-                encoded[j++] = (i + 1 < row->size) ? b64[(n >> 6) & 63] : '=';
-                encoded[j++] = (i + 2 < row->size) ? b64[n & 63] : '=';
-        }
-        encoded[j] = '\0';
-        dprintf(STDOUT_FILENO, "\x1b]52;c;%s\x07", encoded);
-        free(encoded);
-        notify(1, "Yanked");
-}
-
 static void delete_line(void)
 {
         if (Editor.buffer_rows > 0 && Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) {
@@ -374,41 +311,6 @@ static void delete_line(void)
                 Editor.cursor_x = 0;
                 notify(2, "Deleted");
         }
-}
-
-static void goto_line(void)
-{
-        char *command = prompt("Go to line: ");
-        if (!command) {
-                Editor.mode = 0;
-                refresh();
-                return;
-        }
-        char *trimmed = command;
-        while (isspace((unsigned char) *trimmed))
-                trimmed++;
-        char *end = trimmed + strlen(trimmed) - 1;
-        while (end > trimmed && isspace((unsigned char) *end))
-                *end-- = '\0';
-        char *endptr;
-        long line_number = strtol(trimmed, &endptr, 10);
-        while (*endptr && isspace((unsigned char) *endptr))
-                endptr++;
-        int valid = (*endptr == '\0' && line_number > 0 && line_number <= Editor.buffer_rows);
-        free(command);
-        if (valid) {
-                Editor.cursor_y = (int) line_number - 1;
-                Editor.cursor_x = 0;
-                if (Editor.cursor_y < Editor.row_offset)
-                        Editor.row_offset = Editor.cursor_y;
-                if (Editor.cursor_y >= Editor.row_offset + Editor.editor_rows)
-                        Editor.row_offset = Editor.cursor_y - Editor.editor_rows + 1;
-                notify(2, "Jumped");
-        } else {
-                notify(1, "Invalid");
-        }
-        Editor.mode = 0;
-        refresh();
 }
 
 static void handle_normal_mode(int c)
@@ -430,13 +332,13 @@ static void handle_normal_mode(int c)
                 save_file();
                 return;
         case KEY_TOGGLE_HELP:
-                handle_help();
+                handle_view_toggle(VIEW_TYPE_HELP);
                 return;
         case KEY_TOGGLE_FIND:
                 toggle_workspace_find();
                 return;
         case KEY_TOGGLE_TAGS:
-                handle_tags();
+                handle_view_toggle(VIEW_TYPE_TAGS);
                 return;
         case KEY_TOGGLE_FILE_TREE:
                 toggle_file_tree();
@@ -448,14 +350,67 @@ static void handle_normal_mode(int c)
                 workspace_find_next(-1);
                 return;
         case KEY_YANK_LINE:
-                yank_line();
+                if (Editor.cursor_y >= 0
+                    && Editor.cursor_y < Editor.buffer_rows) {
+                        struct Row *row = &Editor.row[Editor.cursor_y];
+                        static const char b64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+                        char *encoded = safe_malloc(((row->size + 2) / 3) * 4 + 1);
+                        int j = 0;
+                        for (int i = 0; i < row->size; i += 3) {
+                                int n = row->chars[i] << 16;
+                                if (i + 1 < row->size)
+                                        n |= row->chars[i + 1] << 8;
+                                if (i + 2 < row->size)
+                                        n |= row->chars[i + 2];
+                                encoded[j++] = b64[(n >> 18) & 63];
+                                encoded[j++] = b64[(n >> 12) & 63];
+                                encoded[j++] = (i + 1 < row->size) ? b64[(n >> 6) & 63] : '=';
+                                encoded[j++] = (i + 2 < row->size) ? b64[n & 63] : '=';
+                        }
+                        encoded[j] = '\0';
+                        dprintf(STDOUT_FILENO, "\x1b]52;c;%s\x07", encoded);
+                        free(encoded);
+                        notify(1, "Yanked");
+                }
                 break;
         case KEY_DELETE_LINE:
                 delete_line();
                 break;
         case KEY_GO_TO_LINE:
-                goto_line();
-                return;
+                {
+                        char *command = prompt("Go to line: ");
+                        if (!command) {
+                                Editor.mode = 0;
+                                refresh();
+                                return;
+                        }
+                        char *trimmed = command;
+                        while (isspace((unsigned char) *trimmed))
+                                trimmed++;
+                        char *end = trimmed + strlen(trimmed) - 1;
+                        while (end > trimmed && isspace((unsigned char) *end))
+                                *end-- = '\0';
+                        char *endptr;
+                        long line_number = strtol(trimmed, &endptr, 10);
+                        while (*endptr && isspace((unsigned char) *endptr))
+                                endptr++;
+                        int valid = (*endptr == '\0' && line_number > 0 && line_number <= Editor.buffer_rows);
+                        free(command);
+                        if (valid) {
+                                Editor.cursor_y = (int) line_number - 1;
+                                Editor.cursor_x = 0;
+                                if (Editor.cursor_y < Editor.row_offset)
+                                        Editor.row_offset = Editor.cursor_y;
+                                if (Editor.cursor_y >= Editor.row_offset + Editor.editor_rows)
+                                        Editor.row_offset = Editor.cursor_y - Editor.editor_rows + 1;
+                                notify(2, "Jumped");
+                        } else {
+                                notify(1, "Invalid");
+                        }
+                        Editor.mode = 0;
+                        refresh();
+                        return;
+                }
         case KEY_MOVE_LEFT:
         case KEY_MOVE_DOWN:
         case KEY_MOVE_UP:
@@ -470,42 +425,6 @@ static void handle_normal_mode(int c)
         case KEY_CTRL_ARROW_RIGHT:
                 cursor_move(c);
                 break;
-        }
-}
-
-static void auto_dedent(void)
-{
-        if (Editor.cursor_y < 0 || Editor.cursor_y >= Editor.buffer_rows)
-                return;
-        struct Row *row = &Editor.row[Editor.cursor_y];
-        for (int i = 0; i < Editor.cursor_x - 1; i++)
-                if (row->chars[i] != ' ' && row->chars[i] != '\t')
-                        return;
-        int leading = 0;
-        for (int i = 0; i < row->size; i++) {
-                if (row->chars[i] == ' ' || row->chars[i] == '\t')
-                        leading++;
-                else
-                        break;
-        }
-        if (leading >= TAB_SIZE) {
-                int spaces_to_remove = 0;
-                for (int i = 0; i < row->size && i < TAB_SIZE; i++) {
-                        if (row->chars[i] == ' ')
-                                spaces_to_remove++;
-                        else
-                                break;
-                }
-                if (spaces_to_remove == 0)
-                        return;
-                memmove(row->chars, row->chars + spaces_to_remove, row->size - spaces_to_remove + 1);
-                row->size -= spaces_to_remove;
-                memmove(row->state, row->state + spaces_to_remove, row->size);
-                resize_row(row, row->size);
-                Editor.cursor_x -= spaces_to_remove;
-                if (Editor.cursor_x < 0)
-                        Editor.cursor_x = 0;
-                Editor.modified = 1;
         }
 }
 
@@ -532,8 +451,48 @@ static void handle_insert_mode(int c)
                 if (c >= 32 && c < 127) {
                         Editor.modified = 1;
                         insert_character((char) c);
-                        if (c == '}' || c == ')' || c == ']')
-                                auto_dedent();
+                        if (c == '}' || c == ')' || c == ']') {
+                                if (Editor.cursor_y >= 0 && Editor.cursor_y < Editor.buffer_rows) {
+                                        struct Row *row = &Editor.row[Editor.cursor_y];
+                                        int should_dedent = 1;
+                                        for (int i = 0; i < Editor.cursor_x - 1;
+                                             i++) {
+                                                if (row->chars[i] != ' ' && row->chars[i] != '\t') {
+                                                        should_dedent = 0;
+                                                        break;
+                                                }
+                                        }
+                                        if (should_dedent) {
+                                                int leading = 0;
+                                                for (int i = 0; i < row->size;
+                                                     i++) {
+                                                        if (row->chars[i] == ' ' || row->chars[i] == '\t')
+                                                                leading++;
+                                                        else
+                                                                break;
+                                                }
+                                                if (leading >= TAB_SIZE) {
+                                                        int spaces_to_remove = 0;
+                                                        for (int i = 0;
+                                                             i < row->size && i < TAB_SIZE;
+                                                             i++) {
+                                                                if (row-> chars[i] == ' ')
+                                                                        spaces_to_remove++;
+                                                                else
+                                                                        break;
+                                                        }
+                                                        if (spaces_to_remove > 0) {
+                                                                memmove(row->chars, row->chars + spaces_to_remove, row->size - spaces_to_remove + 1);
+                                                                row->size -= spaces_to_remove;
+                                                                memmove(row->state, row->state + spaces_to_remove, row->size);
+                                                                resize_row(row, row->size);
+                                                                Editor.cursor_x -= spaces_to_remove;
+                                                                if (Editor.cursor_x < 0) Editor.cursor_x = 0;
+                                                        }
+                                                }
+                                        }
+                                }
+                        }
                 }
                 break;
         }
@@ -543,7 +502,53 @@ void process_keypress(void)
 {
         int c = input_read_key();
         if (Editor.file_tree || Editor.help_view) {
-                handle_spec(c);
+                int is_file_tree = Editor.file_tree;
+                switch (c) {
+                case KEY_QUIT:
+                        handle_quit();
+                        break;
+                case KEY_TOGGLE_FILE_TREE:
+                        toggle_file_tree();
+                        return;
+                case KEY_ESCAPE:
+                case 'q':
+                        if (is_file_tree) {
+                                toggle_file_tree();
+                        } else {
+                                run_cleanup();
+                                Editor.help_view = 0;
+                                if (Editor.buffer_rows == 0)
+                                        append_row("", 0);
+                        }
+                        return;
+                case KEY_COMMAND_MODE:
+                        Editor.mode = 2;
+                        command_mode();
+                        return;
+                case KEY_ENTER:
+                        if (is_file_tree)
+                                open_file_tree();
+                        return;
+                case KEY_TOGGLE_HELP:
+                        if (!is_file_tree)
+                                handle_view_toggle(VIEW_TYPE_HELP);
+                        return;
+                case KEY_ARROW_UP:
+                case KEY_ARROW_DOWN:
+                case KEY_ARROW_LEFT:
+                case KEY_ARROW_RIGHT:
+                case KEY_CTRL_ARROW_UP:
+                case KEY_CTRL_ARROW_DOWN:
+                case KEY_CTRL_ARROW_LEFT:
+                case KEY_CTRL_ARROW_RIGHT:
+                case KEY_MOVE_LEFT:
+                case KEY_MOVE_DOWN:
+                case KEY_MOVE_UP:
+                case KEY_MOVE_RIGHT:
+                        cursor_move(c);
+                        break;
+                }
+                refresh();
                 return;
         }
         switch (c) {
@@ -552,7 +557,7 @@ void process_keypress(void)
                 break;
         case KEY_TOGGLE_TAGS:
                 if (Editor.mode == 0)
-                        handle_tags();
+                        handle_view_toggle(VIEW_TYPE_TAGS);
                 break;
         case KEY_TOGGLE_FILE_TREE:
                 if (Editor.mode == 0)
@@ -562,7 +567,7 @@ void process_keypress(void)
                 if (Editor.mode == 1)
                         delete_line();
                 else if (Editor.mode == 0)
-                        handle_help();
+                        handle_view_toggle(VIEW_TYPE_HELP);
                 break;
         case KEY_CTRL_BACKSPACE:
                 if (Editor.mode == 1)
